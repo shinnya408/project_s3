@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お気に入り・タグ管理</title>
+    <link rel="stylesheet" href="css/exam_config.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <style>
+        /* タグ管理専用の追加スタイル */
+        .tag-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .tag-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+        }
+        .tag-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            margin-left: 10px;
+        }
+        .btn-edit { color: var(--primary); }
+        .btn-delete { color: var(--danger); }
+        .btn-delete:hover { filter: brightness(0.8); }
+        
+        .add-tag-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+
+    <div class="container" style="position: relative; margin-top: 40px;">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.5em;">⭐ お気に入り・タグ設定</h1>
+            <button class="btn btn-back" onclick="goBack()">← メニューへ</button>
+        </div>
+
+        <!-- タグのCRUD（管理）セクション -->
+        <div class="form-group" style="background: rgba(59, 130, 246, 0.05); padding: 20px; border-radius: 8px; border: 1px solid var(--border);">
+            <h3 style="margin-top: 0;">🏷️ タグの管理 (作成・編集・削除)</h3>
+            
+            <div class="add-tag-form">
+                <input type="text" id="new-tag-input" class="form-control" placeholder="新しいタグ名を入力 (例: 苦手な計算)">
+                <button class="btn btn-next" onclick="createTag()">追加</button>
+            </div>
+
+            <ul id="tag-manage-list" class="tag-list">
+                <!-- JSで動的にリストを生成 -->
+            </ul>
+        </div>
+
+        <hr style="border: 0; border-top: 2px dashed var(--border); margin: 30px 0;">
+
+        <!-- 出題設定セクション -->
+        <div class="form-group">
+            <h3 style="margin-top: 0;">🚀 出題するタグの選択 (複数選択可)</h3>
+            <p style="font-size: 0.9em; color: var(--text-sub);">チェックしたタグが付いている問題のみを、一問一答形式で出題します。</p>
+            
+            <div id="tag-select-group" class="checkbox-group">
+                <!-- JSで動的にチェックボックスを生成 -->
+            </div>
+        </div>
+
+        <div class="footer-actions" style="justify-content: flex-end;">
+            <button class="btn btn-next" style="font-size: 1.2em; padding: 15px 30px;" onclick="startFavoriteMode()">一問一答を開始する ＞</button>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/favorite_filter.js"></script>
+</body>
+</html>

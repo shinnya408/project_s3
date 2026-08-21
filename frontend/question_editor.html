@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題 編集・登録</title>
+    <link rel="stylesheet" href="css/question_editor.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <div class="header-container">
+        <h1>問題 編集・登録</h1>
+        <a href="index.html" class="back-link">← トップへ戻る</a>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="form-group" style="display: flex; gap: 10px; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label>対象の問題集</label>
+                    <select id="workbook-select" onchange="loadQuestions()">
+                        <option value="">読込中...</option>
+                    </select>
+                </div>
+                <button class="btn btn-outline" onclick="showNewWorkbookForm()" style="padding: 8px 12px; height: 38px;">+ 新規</button>
+            </div>
+
+            <div id="new-workbook-form" style="display: none; background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px dashed var(--primary-color);">
+                <h4 style="margin-top: 0; margin-bottom: 10px;">新しい問題集を作成</h4>
+                <div class="form-group">
+                    <label>問題集の名前</label>
+                    <input type="text" id="new-workbook-name" placeholder="例: ITパスポート 2026年版">
+                </div>
+                <div class="form-group">
+                    <label>出題形式</label>
+                    <select id="new-workbook-format">
+                        <option value="MULTIPLE_CHOICE">選択問題</option>
+                        <option value="DRAG_AND_DROP">ドラッグアンドドロップ</option>
+                        <option value="SIMULATION">シミュレーション</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-success" style="flex: 1;" onclick="saveNewWorkbook()">作成</button>
+                    <button class="btn btn-outline" style="flex: 1;" onclick="hideNewWorkbookForm()">キャンセル</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>登録済み問題一覧</h3>
+            </div>
+            
+            <div class="form-group" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="search-id-input" placeholder="🔍 IDで検索 (例: 12)" oninput="renderQuestionList()" style="background-color: var(--bg-color); flex: 1;">
+                
+                <select id="sort-select" onchange="renderQuestionList()" style="width: auto; background-color: var(--bg-color);">
+                    <option value="id-asc">ID順 (昇順)</option>
+                    <option value="id-desc">ID順 (降順)</option>
+                    <option value="major-asc">大項目順</option>
+                    <option value="medium-asc">中項目順</option>
+                    <option value="minor-asc">小項目順</option>
+                </select>
+            </div>
+
+            <ul class="question-list" id="question-list"></ul>
+        </div>
+
+        <div class="editor-area">
+            <div class="tabs">
+                <!-- 四択問題用のタブ群（idを付与） -->
+                <button id="tab-mcq-edit" class="tab-btn active" onclick="prepareNewMcq()">個別の編集</button>
+                <button id="tab-mcq-manual" class="tab-btn" onclick="switchTab('manual-bulk')">手動複数登録</button>
+                <button id="tab-mcq-paste" class="tab-btn" onclick="switchTab('paste-bulk')">コピペ一括登録</button>
+                
+                <!-- 常に表示するタブ（idなし＝絶対に消えない） -->
+                <button class="tab-btn" onclick="switchTab('bulk-category')">項目の一括設定</button>
+                <button class="tab-btn" onclick="switchTab('category-manage')">カテゴリ管理</button>
+                
+                <!-- ★ 追加: 模試設定タブ -->
+                <button id="tab-exam-setting" class="tab-btn" onclick="switchTab('exam-setting')" style="display: none;">模試設定</button>
+                
+                <!-- D&D問題用のタブ -->
+                <button id="tab-dd-edit" class="tab-btn" onclick="prepareNewDd()" style="display: none;">D&D問題の作成 新規作成</button>
+                
+                <!-- シミュレーション用のタブ -->
+                <button id="tab-sim-edit" class="tab-btn" onclick="prepareNewSim()" style="display: none;">シミュレーション作成 新規作成</button>
+            </div>
+
+            <!-- ★ 追加: 模試設定タブのコンテンツ -->
+            <div id="exam-setting-mode" class="tab-content" style="display: none;">
+                <h2>模試設定 (デフォルト値)</h2>
+                <p>模試モードを開始した際に適用されるデフォルトの問題数と制限時間を設定します。</p>
+                <div class="form-group">
+                    <label>デフォルト問題数 (問)</label>
+                    <input type="number" id="exam-setting-count" placeholder="例: 20" class="form-control" style="width: 100%; padding: 8px;">
+                </div>
+                <div class="form-group">
+                    <label>デフォルト制限時間 (秒)</label>
+                    <input type="number" id="exam-setting-time" placeholder="例: 3600 (60分)" class="form-control" style="width: 100%; padding: 8px;">
+                    <p style="font-size: 0.85em; color: var(--format-text);">※60分の場合は 3600 を入力してください。</p>
+                </div>
+                <button class="btn btn-success full-width" onclick="saveExamSetting()">設定を保存する</button>
+            </div>
+
+            <div id="category-manage-mode" class="tab-content" style="display: none;">
+                <h2>カテゴリの管理</h2>
+                <p>この問題集で使用するカテゴリ名と並び順（シーケンス）を設定します。</p>
+                <div class="info-box">
+                    ※上から順番に sequence: 1, 2, 3... と自動的に割り当てられます。
+                </div>
+                
+                <div id="category-list-container" style="margin-bottom: 20px;">
+                    </div>
+
+                <button class="btn btn-outline full-width" onclick="addCategoryUI()" style="margin-bottom: 20px;">+ 新しいカテゴリを追加</button>
+                <button class="btn btn-success full-width" onclick="saveCategories()">カテゴリを一括保存する</button>
+            </div>
+
+            <div id="edit-mode" class="tab-content">
+                <h2 id="edit-title">問題を選択してください</h2>
+                <div id="edit-form" style="display: none;">
+                    <div class="form-group">
+                        <label>問題 ID</label>
+                        <input type="text" id="q-id" readonly class="readonly-input">
+                    </div>
+                    
+                    <div class="row-group form-group">
+                        <div>
+                            <label>大項目</label>
+                            <select id="q-major" class="category-select"><option value="">未設定</option></select>
+                        </div>
+                        <div>
+                            <label>中項目</label>
+                            <select id="q-medium" class="category-select"><option value="">未設定</option></select>
+                        </div>
+                        <div>
+                            <label>小項目</label>
+                            <select id="q-minor" class="category-select"><option value="">未設定</option></select>
+                        </div>
+                    </div>
+
+                    <div class="form-group"><label>問題文</label><textarea id="q-text" rows="3"></textarea></div>
+                    <div class="form-group">
+                        <label>問題画像</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="q-image-url" oninput="previewImage('q-image-url', 'q-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
+                            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
+                                📁 画像を選択
+                                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'q-image-url', 'q-image-preview')">
+                            </label>
+                        </div>
+                        <img id="q-image-preview" class="image-preview" style="display: none;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>解説文</label>
+                        <textarea id="q-explanation" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>解説画像</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="q-exp-image-url" oninput="previewImage('q-exp-image-url', 'q-exp-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
+                            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
+                                📁 画像を選択
+                                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'q-exp-image-url', 'q-exp-image-preview')">
+                            </label>
+                        </div>
+                        <img id="q-exp-image-preview" class="image-preview" style="display: none;">
+                    </div>
+
+                    <div class="options-header">
+                        <h3>選択肢 (複数正解可)</h3>
+                        <button class="btn btn-outline" onclick="addOptionUI()">+ 選択肢を追加</button>
+                    </div>
+                    <div class="options-container" id="options-container"></div>
+                    
+                    <button class="btn btn-success full-width" onclick="saveQuestion()">この問題を保存する</button>
+                    <button class="btn btn-danger full-width" onclick="deleteQuestion()" style="margin-top: 10px; background-color: var(--danger-color); color: white;">この問題を削除する</button>
+                </div>
+            </div>
+
+            <div id="manual-bulk-mode" class="tab-content" style="display: none;">
+                <h2>新規問題をまとめて手入力</h2>
+                <div id="manual-bulk-container"></div>
+                <button class="btn btn-outline full-width" onclick="addManualBulkUI()" style="margin-bottom: 20px;">+ 問題の入力枠を追加</button>
+                <button class="btn btn-success full-width" onclick="saveManualBulk()">手入力した問題を一括登録する</button>
+            </div>
+
+            <div id="paste-bulk-mode" class="tab-content" style="display: none;">
+                <h2>スプレッドシートから一括登録</h2>
+                <div class="info-box">
+                    <strong>【列のルール (タブ区切り)】</strong><br>
+                    1列: 問題文 | 2列: 問題画像URL | 3列: 解説 | 4列: 正解番号(1,3等) | 5列目以降: 選択肢1, 選択肢2...
+                </div>
+                <div class="form-group">
+                    <textarea id="tsv-input" rows="10" placeholder="ここにスプレッドシートのデータをペーストしてください"></textarea>
+                </div>
+                <div id="bulk-preview" class="preview-text"></div>
+                <button class="btn btn-success full-width" onclick="savePasteBulk()">ペーストしたデータを一括登録する</button>
+            </div>
+
+            <div id="bulk-category-mode" class="tab-content" style="display: none;">
+                <h2>複数の問題に項目を一括設定</h2>
+                
+                <div class="row-group form-group" style="background: var(--bg-color); padding: 15px; border-radius: 8px;">
+                    <div>
+                        <label>一括設定する大項目</label>
+                        <select id="bulk-major" class="category-select"><option value="">変更しない</option></select>
+                    </div>
+                    <div>
+                        <label>一括設定する中項目</label>
+                        <select id="bulk-medium" class="category-select"><option value="">変更しない</option></select>
+                    </div>
+                    <div>
+                        <label>一括設定する小項目</label>
+                        <select id="bulk-minor" class="category-select"><option value="">変更しない</option></select>
+                    </div>
+                </div>
+
+                <div class="options-header">
+                    <h3>対象問題の選択</h3>
+                    <button class="btn btn-outline" onclick="selectAllForCategory(true)">すべて選択</button>
+                    <button class="btn btn-outline" onclick="selectAllForCategory(false)" style="margin-left:5px;">選択解除</button>
+                </div>
+                
+                <div class="info-box" style="max-height: 300px; overflow-y: auto;" id="category-target-list">
+                    <p style="color: var(--format-text);">※左上で問題集を選択してください</p>
+                </div>
+
+                <button class="btn btn-success full-width" onclick="saveBulkCategory()">選択した問題の項目を更新する</button>
+            </div>
+
+            <div id="dd-edit-mode" class="tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2 id="dd-editor-title" style="margin: 0; color: #1d4ed8;">✨ D&D問題の新規作成</h2>
+                    <button id="dd-btn-to-new" class="btn btn-outline" onclick="prepareNewDd()" style="display: none; padding: 5px 15px; font-size: 0.9em;">＋ 新規作成モードに戻る</button>
+                </div>
+                
+                <input type="hidden" id="dd-q-id">
+
+                <div class="row-group form-group">
+                    <div>
+                        <label>大項目</label>
+                        <select id="dd-q-major" class="category-select"><option value="">未設定</option></select>
+                    </div>
+                    <div>
+                        <label>中項目</label>
+                        <select id="dd-q-medium" class="category-select"><option value="">未設定</option></select>
+                    </div>
+                    <div>
+                        <label>小項目</label>
+                        <select id="dd-q-minor" class="category-select"><option value="">未設定</option></select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>問題文</label>
+                    <textarea id="dd-q-text" rows="3" placeholder="問題文を入力してください"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>問題画像（トポロジ図など）</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="dd-q-image-url" oninput="previewImage('dd-q-image-url', 'dd-q-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
+                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
+                            📁 画像を選択
+                            <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'dd-q-image-url', 'dd-q-image-preview')">
+                        </label>
+                    </div>
+                    <img id="dd-q-image-preview" class="image-preview" style="display: none;">
+                </div>
+
+                <div class="form-group">
+                    <label>解説文</label>
+                    <textarea id="dd-explanation" rows="3" placeholder="問題の解説を入力してください"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>解説画像</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="dd-exp-image-url" oninput="previewImage('dd-exp-image-url', 'dd-exp-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
+                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
+                            📁 画像を選択
+                            <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'dd-exp-image-url', 'dd-exp-image-preview')">
+                        </label>
+                    </div>
+                    <img id="dd-exp-image-preview" class="image-preview" style="display: none;">
+                </div>
+
+                <!-- ドロップゾーン（受け皿）の追加エリア -->
+                <div class="form-group">
+                    <label style="font-size: 1.1em; color: var(--primary-color);">📦 ドロップゾーンと正解アイテム</label>
+                    <p style="font-size: 0.9em; color: var(--format-text); margin-bottom: 10px;">
+                        右側に表示される「受け皿」と、そこに当てはまる正解の「アイテム」をセットで登録します。
+                    </p>
+                    <div id="dd-zones-container">
+                        <!-- JSでここにドロップゾーンの枠が追加されます -->
+                    </div>
+                    <button class="btn btn-outline full-width" onclick="addDropZoneUI()">+ 新しいドロップゾーン（箱）を追加</button>
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px dashed #ccc;">
+
+                <!-- ダミーアイテム（引っかけ）の追加エリア -->
+                <div class="form-group">
+                    <label style="font-size: 1.1em; color: var(--danger-color);">👻 ダミーアイテム（引っかけの選択肢）</label>
+                    <p style="font-size: 0.9em; color: var(--format-text); margin-bottom: 10px;">
+                        どの箱にも入らない、不正解用のダミーアイテムを作成します。（空でもOK）
+                    </p>
+                    <div id="dd-dummies-container" class="options-container" style="background: var(--bg-color); padding: 15px; border-radius: 8px;">
+                        <!-- JSでここにダミーアイテムが追加されます -->
+                    </div>
+                    <button class="btn btn-outline full-width" onclick="addDummyItemUI()">+ ダミーアイテムを追加</button>
+                </div>
+                
+                <div style="margin-top: 30px; display: flex; gap: 10px;">
+                    <button id="dd-btn-save" class="btn btn-primary" onclick="saveDdQuestion()" style="flex: 2;">新規問題として保存する</button>
+                    <button id="dd-btn-delete" class="btn btn-danger" onclick="deleteDdQuestion()" style="flex: 1; display: none;">この問題を削除</button>
+                </div>
+            </div>
+
+            <!-- ★ シミュレーション問題（タスク分割型）の編集モード -->
+            <div id="sim-edit-mode" class="tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eab308; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2 id="sim-editor-title" style="margin: 0; color: #a16207;">✨ シミュレーション問題の新規作成</h2>
+                    <button id="sim-btn-to-new" class="btn btn-outline" onclick="prepareNewSim()" style="display: none; padding: 5px 15px; font-size: 0.9em;">＋ 新規作成モードに戻る</button>
+                </div>
+                
+                <input type="hidden" id="sim-q-id">
+                
+                <div class="row-group form-group">
+                    <div>
+                        <label>大項目</label>
+                        <select id="sim-q-major" class="category-select"><option value="">未設定</option></select>
+                    </div>
+                    <div>
+                        <label>中項目</label>
+                        <select id="sim-q-medium" class="category-select"><option value="">未設定</option></select>
+                    </div>
+                    <div>
+                        <label>小項目</label>
+                        <select id="sim-q-minor" class="category-select"><option value="">未設定</option></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>シナリオ全体（問題の前提となる指示など）</label>
+                    <textarea id="sim-q-text" rows="3" placeholder="例: あなたはネットワークエンジニアです。以下のトポロジとタスクに従って機器を設定してください。"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>トポロジ画像 (任意)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="sim-q-image-url" oninput="previewImage('sim-q-image-url', 'sim-q-image-preview')" placeholder="URLを入力、またはアップロード" style="flex: 1;">
+                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
+                            📁 画像を選択
+                            <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'sim-q-image-url', 'sim-q-image-preview')">
+                        </label>
+                    </div>
+                    <img id="sim-q-image-preview" class="image-preview" style="display: none;">
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px dashed #ccc;">
+
+                <div class="form-group">
+                    <label style="font-size: 1.1em; color: #a16207;">⚙️ 初期コンフィグ (任意)</label>
+                    <p style="font-size: 0.85em; color: var(--format-text);">
+                        ※問題開始時点で機器（ルーターやスイッチ）に設定しておきたいコンフィグがあれば入力してください。<br>
+                        <span style="color: #ef4444; font-weight: bold;">【重要】</span> 複数のインターフェース等を連続して設定する場合は間に <code>exit</code> が必要です（保存時に自動補完されます）。
+                    </p>
+                    <textarea id="sim-initial-config" rows="6" placeholder="!&#10;hostname Switch1&#10;!&#10;interface GigabitEthernet0/0&#10; switchport mode access&#10; exit&#10;!" style="font-family: monospace; background: var(--bg-color);" onblur="if(typeof resetEditorConsole === 'function') resetEditorConsole()"></textarea>
+                </div>
+
+                <!-- テストコンソール -->
+                <div class="form-group" style="background: #27272a; padding: 15px; border-radius: 8px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <label style="font-size: 1.1em; color: #fbbf24;">💻 テストコンソール（動作確認 ＆ ルール抽出用）</label>
+                    <div id="sim-console-output" style="height: 150px; overflow-y: auto; color: #e4e4e7; font-family: monospace; margin-bottom: 10px; white-space: pre-wrap; word-break: break-all;"></div>
+                    <div style="display: flex; align-items: center;">
+                        <span id="sim-console-prompt" style="color: #fbbf24; font-family: monospace; margin-right: 8px;">Router&gt;</span>
+                        <input type="text" id="sim-console-input" style="flex: 1; background: transparent; border: none; color: #e4e4e7; font-family: monospace; outline: none; font-size: 1em;" autocomplete="off" spellcheck="false">
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button class="btn btn-outline" onclick="resetEditorConsole()" style="border-color: #71717a; color: #d4d4d8; padding: 4px 10px; font-size: 0.85em;">↻ コンソール初期化</button>
+                    </div>
+                </div>
+
+                <!-- 💡 タスク管理エリア -->
+                <div class="form-group">
+                    <label style="font-size: 1.2em; color: #a16207; font-weight: bold;">📝 タスク一覧</label>
+                    <p style="font-size: 0.9em; color: var(--format-text); margin-bottom: 15px;">
+                        受験者が解くべき課題をタスク単位で分割して設定します。<br>
+                        ※練習モードでは「解説・解答例」が受験者の画面に表示されます。
+                    </p>
+                    <div id="sim-tasks-container">
+                        <!-- JSでタスクボックスが追加されます -->
+                    </div>
+                    <button class="btn btn-outline full-width" onclick="addSimTaskUI()" style="border-color: #eab308; color: #a16207; margin-top: 15px; border-style: dashed;">+ 新しいタスクを追加する</button>
+                </div>
+
+                <!-- 保存・削除ボタン部分 -->
+                <div style="margin-top: 30px; display: flex; gap: 10px;">
+                    <button id="sim-btn-preview" class="btn btn-outline" onclick="previewSimQuestion()" style="flex: 1; border-color: #0ea5e9; color: #0ea5e9;">👀 プレビュー</button>
+                    <button id="sim-btn-save" class="btn btn-success" onclick="saveSimQuestion()" style="flex: 2; background-color: #eab308; border-color: #eab308; color: #451a03;">新規問題として保存する</button>
+                    <button id="sim-btn-delete" class="btn btn-danger" onclick="deleteSimQuestion()" style="flex: 1; display: none;">この問題を削除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/common.js"></script>
+    <script src="js/simulator_engine.js"></script>
+    <script src="js/question_editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シミュレーション学習メニュー</title>
+    <link rel="stylesheet" href="css/player_menu.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <div id="toast-container" class="toast-notification"></div>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+    
+    <div class="container" style="margin-top: 40px;">
+        <div class="header">
+            <a href="index.html" class="back-btn">← 問題集一覧へ</a>
+            <h1 id="workbook-title" class="page-title">問題集を読み込み中...</h1>
+        </div>
+
+        <h2 class="section-title">学習モードを選択</h2>
+        
+        <div class="menu-grid">
+            <!-- ① 練習モード -->
+            <div class="menu-card" onclick="goToMode('practice')">
+                <div class="icon">📖</div>
+                <div class="menu-title">練習モード (1問一答)</div>
+                <div class="menu-desc">ヒントや模範解答を参照しながら、リアルタイムで設定の正誤を確認して学習します。</div>
+            </div>
+
+            <!-- ② 模試モード -->
+            <div class="menu-card" onclick="goToMode('exam')">
+                <div class="icon">🎯</div>
+                <div class="menu-title">本番・模試モード</div>
+                <div class="menu-desc">ヒント非表示でコンフィグを設定し、最後に一括採点して実力を試します。</div>
+            </div>
+
+            <!-- ③ フリーモード -->
+            <div class="menu-card" onclick="goToMode('free')">
+                <div class="icon">🧪</div>
+                <div class="menu-title">フリーモード (サンドボックス)</div>
+                <div class="menu-desc">問題の制限を受けず、ルーターやスイッチのコマンド入力やコンフィグ構築を自由に練習できます。</div>
+            </div>
+        </div>
+
+        <h2 class="section-title stats-title">成績・データ</h2>
+        
+        <div class="stats-section">
+            <!-- ④ 成績データ -->
+            <div class="menu-card stats-card" onclick="goToMode('stats')">
+                <div class="icon">📊</div>
+                <div>
+                    <div class="menu-title">成績データ</div>
+                    <div class="menu-desc">全問題の正答率や達成度を確認します。</div>
+                </div>
+            </div>
+
+            <!-- ⑤ 過去の成績 -->
+            <div class="menu-card stats-card" onclick="goToMode('history')">
+                <div class="icon">📁</div>
+                <div>
+                    <div class="menu-title">過去の成績</div>
+                    <div class="menu-desc">過去に実施したシミュレーション演習のスコア履歴を確認します。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/sim_menu.js"></script>
+</body>
+</html>

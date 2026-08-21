@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模試モード - 実行中</title>
+    <link rel="stylesheet" href="css/exam_player.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <!-- 上部バー -->
+    <header class="top-bar">
+        <div class="header-left">
+            <button onclick="openQuitModal()" class="btn-text">← メニュー</button>
+            <span id="progress-text" class="progress-badge">問 1 / 20</span>
+        </div>
+        
+        <div class="header-center">
+            <span id="timer-display" class="timer-badge">⏳ 00:00:00</span>
+            <!-- オートセーブインジケーター（通常は見えない） -->
+            <span id="save-indicator" style="font-size: 0.8em; color: var(--text-sub); margin-left: 10px; opacity: 0; transition: opacity 0.5s;">保存中...</span>
+        </div>
+
+        <div class="header-right">
+            <button class="icon-btn" onclick="openMemoModal()" title="メモ帳を開く">📝</button>
+            <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+        </div>
+    </header>
+
+    <!-- メインエリア -->
+    <div class="main-wrapper">
+        <button id="btn-prev-side" class="side-nav-btn prev-btn" onclick="prevQuestion()">＜</button>
+
+        <div class="content-area">
+            <!-- 問題文エリア -->
+            <div class="question-box">
+                <div class="q-header" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <span id="q-no-badge" class="badge">第 1 問</span>
+                    <span id="q-id-badge" class="badge category-badge">ID: --</span>
+                    
+                    <div style="margin-left: auto; display: flex; gap: 8px;">
+                        <!-- お気に入りアイコン -->
+                        <span id="q-fav-indicator" class="badge" style="background: #fcd34d; color: #b45309; display: none;">
+                            ⭐ お気に入り
+                        </span>
+                        <!-- フラグ（見直し）アイコン -->
+                        <span id="q-flag-indicator" class="badge" style="background: #fbbf24; color: #000; display: none;">
+                            🚩 見直し
+                        </span>
+                    </div>
+                </div>
+                <h3 id="q-text" class="q-text">問題文を読み込み中...</h3>
+                <img id="q-image" class="q-image hidden" src="" alt="問題画像">
+            </div>
+
+            <!-- 解答エリア -->
+            <div id="play-area" class="play-area">
+                <!-- 選択肢が描画されます -->
+            </div>
+        </div>
+
+        <button id="btn-next-side" class="side-nav-btn next-btn" onclick="nextQuestion()">＞</button>
+    </div>
+
+    <!-- 下部固定バー -->
+    <footer class="bottom-bar">
+        <div class="bottom-bar-inner">
+            <button id="btn-fav" class="action-btn" onclick="openQuizTagModal()">⭐ お気に入り</button>
+            <button id="btn-flag" class="action-btn" onclick="toggleFlag()">🚩 フラグ</button>
+            <button class="action-btn" onclick="showExamListModal()">📋 一覧</button>
+            <button id="btn-prev-bottom" class="action-btn" onclick="prevQuestion()">＜ 前へ</button>
+            <button id="btn-next-bottom" class="action-btn" onclick="nextQuestion()">次へ ＞</button>
+            <button id="btn-submit" class="action-btn submit-btn" style="background-color: var(--danger);" onclick="finishExam()">🛑 解答する (採点)</button>
+        </div>
+    </footer>
+
+    <!-- 中断・破棄選択モーダル -->
+    <div id="quit-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 1.2em;">中断メニュー</h2>
+                <button class="close-btn" onclick="closeModal('quit-modal')">×</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+                <p style="margin-bottom: 5px;">模試を終了してメニューに戻ります。<br>どうしますか？</p>
+                <!-- セーブデータは毎秒保存されているので、単にメニューに戻るだけ -->
+                <button class="action-btn submit-btn" onclick="suspendExam()">⏸️ 一時中断 (後で再開する)</button>
+                <button class="action-btn" style="background: var(--danger); color: white;" onclick="discardExam()">🗑️ 破棄する (記録せず戻る)</button>
+                <button class="action-btn" onclick="closeModal('quit-modal')">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一覧モーダル -->
+    <div id="list-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>解答状況一覧</h2>
+                <button class="close-btn" onclick="closeModal('list-modal')">×</button>
+            </div>
+            <div id="list-container" class="modal-body">
+                <!-- JSで生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- デジタルメモ帳 モーダル -->
+    <div id="memo-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">📝 デジタルメモ帳</h3>
+                <button class="close-btn" onclick="closeMemoModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.9em; color: var(--text-sub); margin-top: 0;">計算や思考の整理に自由に使ってください。（模試全体で共通です）</p>
+                <textarea id="exam-memo-text" style="width: 100%; height: 200px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-main); color: var(--text-main); font-family: sans-serif; resize: vertical;" placeholder="ここにメモを入力..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🏷️ お気に入り追加・解除モーダル -->
+    <div id="quiz-tag-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">🏷️ お気に入りの追加・解除</h3>
+                <button class="close-btn" onclick="document.getElementById('quiz-tag-modal').classList.add('hidden')">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="quiz-new-tag-input" placeholder="新しいお気に入り名を入力" class="input-text" style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-main); color: var(--text-main);">
+                    <button class="btn-primary" style="padding: 8px 15px; border: none; border-radius: 4px; background: var(--primary); color: white; cursor: pointer; font-weight: bold;" onclick="addNewTagFromQuiz()">作成</button>
+                </div>
+
+                <p style="font-size: 0.9em; color: var(--text-sub); margin-top: 0;">この問題に付けるお気に入りをチェックしてください。</p>
+                <div id="quiz-tag-checkboxes" class="checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- JSで動的に生成 -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px; border-top: 1px solid var(--border); text-align: right;">
+                <button class="btn" style="background: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="saveQuizTags()">保存して閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⌨️ ショートカット一覧（ヘルプ）モーダル -->
+    <div id="shortcut-help-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">⌨️ キーボードショートカット</h3>
+                <button class="close-btn" onclick="closeAllModals()">×</button>
+            </div>
+            <div class="modal-body" style="line-height: 1.8;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">移動・選択</p>
+                        <p><strong>← / →</strong> : 前へ / 次へ</p>
+                        <p><strong>↑ / ↓</strong> : 選択肢の移動</p>
+                        <p><strong>1 〜 0</strong> : 選択肢を直接選択</p>
+                    </div>
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">アクション</p>
+                        <p><strong>F</strong> : フラグON / OFF</p>
+                    </div>
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">各種画面</p>
+                        <p><strong>L</strong> : 問題一覧 (List)</p>
+                        <p><strong>M</strong> : メモ帳 (Memo)</p>
+                        <p><strong>Esc</strong> : 画面を閉じる</p>
+                    </div>
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">システム</p>
+                        <p><strong>B</strong> : メニューへ戻る</p>
+                        <p><strong>T</strong> : テーマ切替 (Theme)</p>
+                        <p><strong>?</strong> : このヘルプを表示</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/exam_player.js"></script>
+</body>
+</html>

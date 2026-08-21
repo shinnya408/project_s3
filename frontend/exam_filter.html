@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>模試設定 (1/2) - 出題フィルタ</title>
+    <link rel="stylesheet" href="css/exam_config.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+
+    <div class="container" style="position: relative; margin-top: 40px;">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.5em;">出題問題フィルタ</h1>
+            <span class="step-badge">Step 1 / 2</span>
+        </div>
+
+        <!-- 出題順 -->
+        <div class="form-group">
+            <label class="form-label">出題順</label>
+            <select id="filter-order" class="form-control">
+                <option value="priority">優先順 (ベンチ→赤→黄→G→ハットトリック)</option>
+                <option value="random" selected>ランダム出題</option>
+                <option value="category">カテゴリ順</option>
+            </select>
+        </div>
+
+        <!-- ハッシュ値 -->
+        <div class="form-group">
+            <label class="form-label">ハッシュ値 (任意)</label>
+            <input type="text" id="filter-hash" class="form-control" placeholder="例: test2024">
+        </div>
+
+        <!-- ステータス絞り込み -->
+        <div class="form-group">
+            <label class="form-label">対象ステータス (複数選択可)</label>
+            <div class="checkbox-group">
+                <label class="check-label"><input type="checkbox" name="status" value="bench" checked> 🪑 ベンチ</label>
+                <label class="check-label"><input type="checkbox" name="status" value="red" checked> 🟥 レッド</label>
+                <label class="check-label"><input type="checkbox" name="status" value="yellow" checked> 🟨 イエロー</label>
+                <label class="check-label"><input type="checkbox" name="status" value="goal" checked> ⚽ ゴール</label>
+                <label class="check-label"><input type="checkbox" name="status" value="hat" checked> 🎩 ハット</label>
+            </div>
+        </div>
+
+        <!-- ★ 修正：動的にタグを生成するコンテナ -->
+        <div class="form-group">
+            <label class="form-label">お気に入りタグ (複数選択可・空で全て対象)</label>
+            <div class="checkbox-group" id="tag-container">
+                <p style="color: var(--text-sub); font-size: 0.9em;">タグを読み込み中...</p>
+            </div>
+        </div>
+
+        <!-- ★ 修正：動的にカテゴリを生成するコンテナ -->
+        <div class="form-group">
+            <label class="form-label">対象カテゴリ (複数選択可・空で全て対象)</label>
+            <div class="checkbox-group" id="category-container">
+                <p style="color: var(--text-sub); font-size: 0.9em;">カテゴリを読み込み中...</p>
+            </div>
+        </div>
+
+        <div class="footer-actions">
+            <button class="btn btn-back" onclick="goBack()">← メニューへ</button>
+            <button class="btn btn-next" onclick="goToNext()">次へ (オプション設定) →</button>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/exam_filter.js"></script>
+</body>
+</html>

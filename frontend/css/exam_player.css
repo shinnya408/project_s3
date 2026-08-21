@@ -1,0 +1,134 @@
+/* exam_player.css */
+:root {
+    --bg-main: #f1f5f9;
+    --bg-card: #ffffff;
+    --text-main: #0f172a;
+    --text-sub: #64748b;
+    --border: #e2e8f0;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+}
+
+[data-theme="dark"] {
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --border: #334155;
+    --primary: #60a5fa;
+}
+
+body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg-main); color: var(--text-main); padding-bottom: 80px; transition: background-color 0.3s, color 0.3s; }
+.hidden { display: none !important; }
+
+.top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background-color: var(--bg-card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.btn-text, .icon-btn { background: none; border: none; color: var(--text-main); cursor: pointer; font-size: 1em; }
+.badge { background: var(--border); color: var(--text-main); padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
+.category-badge { background: var(--primary); color: #fff; }
+
+.timer-badge { background: var(--bg-main); padding: 6px 12px; border-radius: 20px; border: 2px solid var(--border); font-size: 1.2em; font-weight: bold; font-family: monospace; }
+.timer-warning { border-color: var(--danger); color: var(--danger); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0.5; } }
+
+.main-wrapper { display: flex; max-width: 1000px; margin: 20px auto; align-items: stretch; gap: 20px; }
+.content-area { flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.side-nav-btn { width: 50px; background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; font-size: 1.5em; color: var(--text-sub); cursor: pointer; }
+.side-nav-btn:hover:not(:disabled) { background-color: var(--border); color: var(--text-main); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.question-box, .play-area { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+
+.bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background-color: var(--bg-card); border-top: 1px solid var(--border); padding: 10px 0; z-index: 100; }
+.bottom-bar-inner { max-width: 1000px; margin: 0 auto; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 0 10px; }
+.action-btn { background-color: var(--bg-main); border: 1px solid var(--border); color: var(--text-main); padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+.action-btn:hover { filter: brightness(0.95); }
+.submit-btn { background-color: var(--primary); color: #fff; border: none; }
+
+/* モーダル */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 200; }
+.modal-content { background: var(--bg-card); width: 90%; max-width: 600px; border-radius: 12px; max-height: 80vh; display: flex; flex-direction: column; }
+.modal-header { display: flex; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid var(--border); }
+.modal-body { padding: 20px; overflow-y: auto; }
+.close-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-main); }
+
+/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+.toast-notification {
+    visibility: hidden;
+    min-width: 250px;
+    
+    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #333333);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    padding: 15px 20px;
+    position: fixed;
+    z-index: 9999;
+    
+    /* ① 画面の右下に配置 */
+    right: 20px;
+    bottom: 20px;
+    
+    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
+    transform: translateX(120%);
+    opacity: 0;
+    
+    /* 滑らかなスライドアニメーションの設定 */
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+    
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+/* 表示された時のクラス（元の位置に戻ってくる） */
+.toast-notification.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0); /* 定位置へスライドイン */
+}
+
+/* ダークモード時の影の調整 */
+[data-theme="dark"] .toast-notification {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+/* ==========================================
+   スマホ用レスポンシブ対応 (画面幅 768px 以下)
+   ========================================== */
+@media (max-width: 768px) {
+    .main-wrapper {
+        margin: 10px;
+        gap: 0;
+    }
+    
+    /* 画面が狭いときは左右の大きなナビボタンを隠し、下部バーのボタンに操作を任せる */
+    .side-nav-btn {
+        display: none;
+    }
+    
+    .question-box, .play-area {
+        padding: 15px;
+    }
+
+    /* 下部バーのボタン群をスマホで押しやすいサイズに調整 */
+    .bottom-bar-inner {
+        gap: 8px;
+    }
+    .action-btn {
+        padding: 8px 12px;
+        font-size: 0.85em;
+        flex: 1 1 auto;
+        text-align: center;
+    }
+    /* 解答ボタンは特に目立たせる */
+    .submit-btn {
+        width: 100%;
+        padding: 12px;
+        font-size: 1em;
+    }
+}

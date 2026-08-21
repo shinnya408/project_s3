@@ -1,0 +1,390 @@
+/* css/sim_player.css */
+@import url('player_menu.css');
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-main, #f8fafc);
+    color: var(--text-main, #0f172a);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ==========================================
+   汎用UIコンポーネント (他画面との統一デザイン)
+   ========================================== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: bold;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.btn-primary {
+    background-color: var(--primary, #3b82f6);
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.btn-primary:hover {
+    background-color: #2563eb;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-outline {
+    background-color: var(--bg-card, #ffffff);
+    border-color: var(--border, #cbd5e1);
+    color: var(--text-main, #334155);
+}
+
+.btn-outline:hover {
+    background-color: var(--bg-main, #f8fafc);
+    border-color: var(--primary, #3b82f6);
+    color: var(--primary, #3b82f6);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.85em;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 1em;
+    font-family: inherit;
+    border: 2px solid var(--border, #cbd5e1);
+    border-radius: 8px;
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #0f172a);
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ==========================================
+   ヘッダーエリア & ヘッダーボタン
+   ========================================== */
+.sim-header {
+    height: 60px;
+    background: var(--bg-card, #ffffff);
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.sim-page-title { margin: 0; font-size: 1.1em; font-weight: bold; }
+
+/* ★ 追加: メニューへ戻るボタンのデザイン統一 */
+.btn-text {
+    background: transparent;
+    border: none;
+    color: var(--primary, #3b82f6);
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-text:hover {
+    background-color: var(--bg-main, #f1f5f9);
+    color: #2563eb;
+}
+
+/* ★ 追加: テーマ切り替えアイコンボタンのデザイン統一 */
+.icon-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover {
+    background-color: var(--bg-main, #f1f5f9);
+    transform: scale(1.1);
+}
+
+.mode-tabs {
+    display: flex;
+    gap: 8px;
+    background: var(--bg-main, #f1f5f9);
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.mode-tab-btn {
+    border: none;
+    background: transparent;
+    padding: 8px 16px;
+    font-size: 0.85em;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-sub, #64748b);
+    transition: all 0.2s ease;
+}
+
+.mode-tab-btn:hover {
+    color: var(--primary, #3b82f6);
+}
+
+.mode-tab-btn.active {
+    background: var(--bg-card, #ffffff);
+    color: var(--primary, #3b82f6);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.free-mode-btn.active { color: #a16207; }
+
+/* ==========================================
+   2ペインレイアウト
+   ========================================== */
+.sim-main-container {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 450px 1fr;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+
+@media (max-width: 900px) {
+    .sim-main-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+}
+
+/* ==========================================
+   左パネル (シナリオ・タスク)
+   ========================================== */
+.left-panel {
+    background: var(--bg-card, #ffffff);
+    border-right: 1px solid var(--border, #e2e8f0);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.left-panel::-webkit-scrollbar { width: 8px; }
+.left-panel::-webkit-scrollbar-track { background: transparent; }
+.left-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.left-panel::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.question-nav-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border, #e2e8f0);
+}
+
+.scenario-card, .tasks-card, .free-info-card {
+    background: var(--bg-main, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.panel-subtitle {
+    margin: 0 0 10px 0;
+    font-size: 1.05em;
+    color: var(--primary, #3b82f6);
+}
+
+.scenario-text {
+    margin: 0;
+    line-height: 1.6;
+    font-size: 0.95em;
+    white-space: pre-wrap;
+}
+
+.topology-container {
+    margin-top: 15px;
+    text-align: center;
+    background: var(--bg-card, #ffffff);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border, #e2e8f0);
+}
+
+.topology-container img {
+    max-width: 100%;
+    border-radius: 4px;
+}
+
+.tasks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.score-badge {
+    font-size: 0.85em;
+    font-weight: bold;
+    background: #e0f2fe;
+    color: #0284c7;
+    padding: 6px 10px;
+    border-radius: 12px;
+}
+
+.tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-card {
+    background: var(--bg-card, #ffffff);
+    border: 2px solid var(--border, #cbd5e1);
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.2s ease;
+}
+
+.task-card.passed {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.task-status-badge {
+    font-size: 0.8em;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.task-status-badge.accomplished { background: #d1fae5; color: #047857; }
+.task-status-badge.unaccomplished { background: #f1f5f9; color: #64748b; }
+.task-status-badge.exam-hidden { background: #fef3c7; color: #b45309; }
+
+.task-number { font-size: 0.85em; font-weight: bold; color: var(--text-sub, #64748b); }
+
+.task-instruction-text { margin: 0; font-size: 0.95em; line-height: 1.5; }
+
+.task-exp-details { margin-top: 10px; font-size: 0.9em; color: #0284c7; cursor: pointer; }
+.task-exp-details summary { font-weight: bold; outline: none; }
+.task-exp-code {
+    background: #27272a; color: #f4f4f5; padding: 10px; border-radius: 6px;
+    font-family: "Consolas", "Courier New", monospace; margin-top: 8px; white-space: pre-wrap;
+}
+
+/* ==========================================
+   右パネル: コンソール
+   ========================================== */
+.right-panel {
+    background: #18181b; padding: 20px; box-sizing: border-box;
+    display: flex; flex-direction: column;
+    min-height: 0;
+}
+
+.cli-container {
+    flex: 1; display: flex; flex-direction: column;
+    background: #09090b; border: 1px solid #27272a; border-radius: 12px;
+    overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    min-height: 0;
+}
+
+.cli-header {
+    height: 40px; background: #18181b; border-bottom: 1px solid #27272a;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 15px;
+}
+
+.cli-title { display: flex; align-items: center; gap: 8px; }
+.cli-dot { width: 12px; height: 12px; border-radius: 50%; }
+.cli-dot.red { background: #ef4444; }
+.cli-dot.yellow { background: #eab308; }
+.cli-dot.green { background: #22c55e; }
+.cli-device-name { color: #a1a1aa; font-size: 0.85em; font-family: monospace; margin-left: 8px; }
+
+.cli-action-btn {
+    background: transparent; border: 1px solid #3f3f46; color: #a1a1aa;
+    font-size: 0.8em; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+    transition: all 0.2s ease;
+}
+.cli-action-btn:hover { color: #ffffff; border-color: #71717a; background: #27272a; }
+
+.cli-terminal {
+    flex: 1; padding: 20px; font-family: "Consolas", "Courier New", monospace;
+    font-size: 1.05em; color: #22c55e; overflow-y: auto; cursor: text;
+}
+
+.cli-terminal::-webkit-scrollbar { width: 10px; }
+.cli-terminal::-webkit-scrollbar-track { background: #09090b; }
+.cli-terminal::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 5px; }
+.cli-terminal::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+.cli-output { white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+.cli-input-line { display: flex; align-items: center; margin-top: 5px; }
+.cli-prompt { color: #eab308; margin-right: 10px; font-weight: bold; }
+.cli-input-field {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: #f4f4f5; font-family: inherit; font-size: inherit;
+}
+
+/* ==========================================
+   ユーティリティクラス
+   ========================================== */
+.hidden { display: none !important; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.margin-top-10 { margin-top: 10px; }
+.margin-top-15 { margin-top: 15px; }
+.margin-top-20 { margin-top: 20px; }
+.full-width { width: 100%; }
+
+.result-score-circle {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: rgba(59, 130, 246, 0.1); border: 5px solid var(--primary, #3b82f6);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto; font-size: 2em; font-weight: 900; color: var(--primary, #3b82f6);
+}

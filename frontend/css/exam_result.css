@@ -1,0 +1,149 @@
+/* exam_result.css */
+:root {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #1e293b;
+    --text-sub: #64748b;
+    --border: #e2e8f0;
+    --primary: #3b82f6;
+    --success: #10b981;
+    --danger: #ef4444;
+}
+
+[data-theme="dark"] {
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --border: #334155;
+    --primary: #60a5fa;
+}
+
+body { font-family: sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; padding: 20px; transition: 0.3s; }
+.container { max-width: 800px; margin: 0 auto; }
+.hidden { display: none !important; }
+
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.page-title { margin: 0; font-size: 1.8em; }
+
+.btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em; border: none; transition: 0.2s; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { filter: brightness(0.9); }
+.btn-outline { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); }
+.btn-outline:hover { background: var(--border); }
+
+/* スコアカード */
+.score-card { background: var(--bg-card); border: 2px solid var(--border); border-radius: 16px; padding: 30px; display: flex; align-items: center; gap: 30px; margin-bottom: 30px; }
+.score-circle { width: 100px; height: 100px; border-radius: 50%; border: 8px solid var(--primary); display: flex; justify-content: center; align-items: center; font-size: 1.8em; font-weight: bold; color: var(--primary); }
+
+/* アクションバー */
+.action-bar { display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
+
+/* 結果リスト */
+.section-title { font-size: 1.3em; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
+.result-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.result-item.correct { border-left: 5px solid var(--success); }
+.result-item.incorrect { border-left: 5px solid var(--danger); }
+.result-status { font-weight: bold; width: 80px; }
+
+/* モーダル */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 200; }
+.modal-content { background: var(--bg-card); width: 90%; max-width: 500px; border-radius: 12px; max-height: 90vh; overflow-y: auto; }
+.modal-header { display: flex; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid var(--border); }
+.modal-body { padding: 20px; }
+.close-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-main); }
+
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; }
+.check-label { background: var(--bg-main); padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.form-control { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; background: var(--bg-main); color: var(--text-main); }
+
+/* テーマ切替 */
+.theme-toggle-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-main); }
+.badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
+
+/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+.toast-notification {
+    visibility: hidden;
+    min-width: 250px;
+    
+    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #333333);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    padding: 15px 20px;
+    position: fixed;
+    z-index: 9999;
+    
+    /* ① 画面の右下に配置 */
+    right: 20px;
+    bottom: 20px;
+    
+    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
+    transform: translateX(120%);
+    opacity: 0;
+    
+    /* 滑らかなスライドアニメーションの設定 */
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+    
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+/* 表示された時のクラス（元の位置に戻ってくる） */
+.toast-notification.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0); /* 定位置へスライドイン */
+}
+
+/* ダークモード時の影の調整 */
+[data-theme="dark"] .toast-notification {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+/* ==========================================
+   スマホ用レスポンシブ対応 (画面幅 768px 以下)
+   ========================================== */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .page-title {
+        font-size: 1.5em;
+    }
+
+    /* スコアカードを縦積みに変更 */
+    .score-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+        padding: 20px;
+    }
+
+    /* アクションボタンを縦並びのフル幅に変更 */
+    .action-bar {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .action-bar .btn {
+        width: 100%;
+    }
+
+    /* 問題ごとの結果リストの文字サイズを調整 */
+    .result-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .result-status {
+        width: auto;
+    }
+}

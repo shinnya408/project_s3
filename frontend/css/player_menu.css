@@ -1,0 +1,194 @@
+/* player_menu.css */
+
+:root {
+    /* ライトモードの色（変数名を全画面で統一しました） */
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #1e293b;
+    --text-sub: #64748b;
+    --border: #e2e8f0;
+}
+
+/* ダークモードの色 */
+[data-theme="dark"] {
+    --primary: #60a5fa;
+    --primary-hover: #3b82f6;
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --border: #334155;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    margin: 0;
+    padding: 20px;
+    transition: background-color 0.3s, color 0.3s; /* ふわっと切り替わるアニメーション */
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 15px;
+}
+
+.back-btn {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 20px;
+    color: var(--text-main);
+    text-decoration: none;
+}
+
+.back-btn:hover { 
+    background: var(--bg-card); 
+    filter: brightness(0.95);
+}
+
+.page-title {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.section-title {
+    font-size: 1.2em;
+    margin-bottom: 15px;
+}
+
+.stats-title {
+    margin-top: 40px;
+}
+
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+/* メニューカードのデザイン */
+.menu-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 2px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.menu-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.icon {
+    font-size: 2.5em;
+    margin-bottom: 15px;
+}
+
+.menu-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: var(--text-main);
+}
+
+.menu-desc {
+    font-size: 0.9em;
+    color: var(--text-sub);
+    line-height: 1.5;
+}
+
+/* 統計エリア（下部） */
+.stats-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.stats-card {
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.stats-card .icon {
+    margin: 0;
+}
+
+.stats-card .menu-title {
+    margin-bottom: 5px;
+}
+
+/* テーマ切替ボタン（右上固定） */
+.theme-toggle-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: var(--text-main);
+}
+
+/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+.toast-notification {
+    visibility: hidden;
+    min-width: 250px;
+    
+    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #333333);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    padding: 15px 20px;
+    position: fixed;
+    z-index: 9999;
+    
+    /* ① 画面の右下に配置 */
+    right: 20px;
+    bottom: 20px;
+    
+    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
+    transform: translateX(120%);
+    opacity: 0;
+    
+    /* 滑らかなスライドアニメーションの設定 */
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+    
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+/* 表示された時のクラス（元の位置に戻ってくる） */
+.toast-notification.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0); /* 定位置へスライドイン */
+}
+
+/* ダークモード時の影の調整 */
+[data-theme="dark"] .toast-notification {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}

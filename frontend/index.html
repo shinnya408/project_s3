@@ -2,13 +2,75 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>問題集選択</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project S³</title>
+    <link rel="stylesheet" href="css/index.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
 </head>
 <body>
-    <h1>資格試験対策 問題集一覧</h1>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <div class="header-container">
+        <h1>Project S³<br>問題集一覧</h1>
+        
+        <div class="header-actions" style="display: flex; align-items: center; gap: 10px;">
+            <span id="user-greeting" style="font-weight: bold; color: var(--text-main);"></span>
+            <button id="logout-btn" class="admin-btn" style="background-color: var(--danger); border-color: var(--danger);" onclick="logout()">
+                🚪 ログアウト
+            </button>
+            <button id="user-management-btn" class="admin-btn" style="display: none; background-color: var(--success); border-color: var(--success);" onclick="location.href='users_management.html'">
+                👥 ユーザー管理
+            </button>
+            <button id="admin-settings-btn" class="admin-btn" style="display: none;" onclick="location.href='question_editor.html'">
+                ⚙️ 問題管理 (管理者用)
+            </button>
+            <button class="theme-toggle-btn" id="theme-toggle">🌙 ダークモード</button>
+        </div>
+    </div>
+    
+    <!-- 変更履歴エリア -->
+    <div style="width: 100%; max-width: 900px; margin-bottom: 20px;">
+        <!-- 管理者用入力フォーム -->
+        <div id="admin-changelog-form" style="display: none; background: var(--card-bg); padding: 15px; border-radius: 8px; border: 2px dashed var(--primary-color); margin-bottom: 15px;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; color: var(--primary-color);">📢 変更履歴の投稿 (管理者専用)</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                <select id="cl-target" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                    <option value="システム全体">システム全体</option>
+                    <option value="選択問題">選択問題</option>
+                    <option value="D&D">D&D</option>
+                    <option value="選択問題/D&D">選択問題/D&D</option>
+                    <option value="シミュレーション">シミュレーション</option>
+                    <option value="その他">その他</option>
+                    <!-- ここにJSで動的に問題集名が追加されます -->
+                </select>
+                <select id="cl-type" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                    <option value="新規問題追加">新規問題追加</option>
+                    <option value="問題修正">問題修正</option>
+                    <option value="不具合修正">不具合修正</option>
+                    <option value="システム更新">システム更新</option>
+                    <option value="その他">その他</option>
+                </select>
+            </div>
+            <textarea id="cl-content" rows="2" placeholder="変更内容を記入..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: 10px; box-sizing: border-box; background: var(--bg-color); color: var(--text-color);"></textarea>
+            <button class="admin-btn" style="width: 100%;" onclick="postChangelog()">投稿する</button>
+        </div>
+
+        <!-- 履歴表示エリア -->
+        <div style="background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px var(--card-shadow);">
+            <h3 style="margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📋 最新の変更履歴</h3>
+            <div id="changelog-list" style="max-height: 200px; overflow-y: auto; font-size: 0.9em; display: flex; flex-direction: column; gap: 10px;">
+                <span class="loading">履歴を読み込んでいます...</span>
+            </div>
+        </div>
+    </div>
+
     <ul id="workbook-list">
-        <li><button onclick="location.href='multiple_choice_main.html?workbookId=1'">ITパスポート 過去問 (選択問題)</button></li>
-        <li><button onclick="location.href='multiple_choice_main.html?workbookId=2'">基本情報技術者 過去問 (選択問題)</button></li>
+        <li class="loading">データを読み込んでいます...</li>
     </ul>
+
+    <script src="js/common.js"></script>
+    <script src="js/index.js"></script>
 </body>
 </html>

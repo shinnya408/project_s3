@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模試モード - 見直し</title>
+    <link rel="stylesheet" href="css/exam_player.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <header class="top-bar">
+        <div class="header-left">
+            <button onclick="goBackToResult()" class="btn-text">← 採点結果へ戻る</button>
+            <span id="progress-text" class="progress-badge">問 1 / 20</span>
+        </div>
+        <div class="header-center">
+            <span class="timer-badge" style="background: var(--success); color: white; border: none;">復習モード</span>
+        </div>
+        <div class="header-right">
+            <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+        </div>
+    </header>
+
+    <div class="main-wrapper">
+        <button id="btn-prev-side" class="side-nav-btn prev-btn" onclick="prevQuestion()">＜</button>
+
+        <div class="content-area">
+            <div class="question-box">
+                <div class="q-header" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <span id="q-no-badge" class="badge">第 1 問</span>
+                    <span id="q-id-badge" class="badge category-badge">ID: --</span>
+                    
+                    <span id="q-flag-indicator" class="badge" style="background: #fbbf24; color: #000; display: none;">
+                        🚩 フラグ
+                    </span>
+
+                    <span id="q-result-badge" class="badge" style="margin-left: auto;">--</span>
+                </div>
+                <h3 id="q-text" class="q-text">問題文を読み込み中...</h3>
+            </div>
+
+            <!-- 選択肢エリア -->
+            <div id="play-area" class="play-area"></div>
+
+            <!-- 解説エリア -->
+            <div class="play-area" style="margin-top: 0; background: var(--bg-main); border-color: var(--primary);">
+                <h4 style="margin-top: 0; color: var(--primary);">📖 解説</h4>
+                <p id="exp-text" style="line-height: 1.6; margin: 0;">解説テキスト</p>
+            </div>
+        </div>
+
+        <button id="btn-next-side" class="side-nav-btn next-btn" onclick="nextQuestion()">＞</button>
+    </div>
+
+    <footer class="bottom-bar">
+        <div class="bottom-bar-inner">
+            <!-- ★ 追加：お気に入り（タグ）操作ボタン -->
+            <button class="action-btn" onclick="openQuizTagModal()">⭐ お気に入り</button>
+            <button class="action-btn" onclick="showExamListModal()">📋 一覧から選ぶ</button>
+            <button id="btn-prev-bottom" class="action-btn" onclick="prevQuestion()">＜ 前へ</button>
+            <button id="btn-next-bottom" class="action-btn" onclick="nextQuestion()">次へ ＞</button>
+        </div>
+    </footer>
+
+    <!-- 一覧モーダル -->
+    <div id="list-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>問題一覧</h2>
+                <button class="close-btn" onclick="closeModal('list-modal')">×</button>
+            </div>
+            <div id="list-container" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- ★ 追加：🏷️ お気に入り追加・解除モーダル -->
+    <div id="quiz-tag-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">🏷️ お気に入りの追加・解除</h3>
+                <button class="close-btn" onclick="closeModal('quiz-tag-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="quiz-new-tag-input" placeholder="新しいお気に入り名を入力" class="input-text" style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-main); color: var(--text-main);">
+                    <button class="btn-primary" style="padding: 8px 15px; border: none; border-radius: 4px; background: var(--primary); color: white; cursor: pointer; font-weight: bold;" onclick="addNewTagFromQuiz()">作成</button>
+                </div>
+
+                <p style="font-size: 0.9em; color: var(--text-sub); margin-top: 0;">この問題に付けるお気に入りをチェックしてください。</p>
+                <div id="quiz-tag-checkboxes" class="checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- JSで動的に生成 -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px; border-top: 1px solid var(--border); text-align: right;">
+                <button class="btn" style="background: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="saveQuizTags()">保存して閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/exam_review.js"></script>
+</body>
+</html>

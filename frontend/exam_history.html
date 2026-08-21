@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>過去の成績</title>
+    <link rel="stylesheet" href="css/player_stats.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <style>
+        /* グラフ用の専用スタイル */
+        .chart-container { 
+            display: flex; align-items: flex-end; justify-content: space-between; 
+            height: 180px; padding: 20px 15px 10px; background: var(--bg-card); 
+            border: 1px solid var(--border); border-radius: 12px; margin-bottom: 30px; gap: 8px; 
+        }
+        .chart-bar-group { 
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end; 
+            height: 100%; flex: 1; position: relative; 
+        }
+        .chart-bar { 
+            width: 100%; max-width: 35px; border-radius: 6px 6px 0 0; 
+            transition: height 0.5s ease; position: relative; cursor: pointer; 
+        }
+        .chart-bar:hover { filter: brightness(1.1); }
+        .chart-bar:hover::after { 
+            content: attr(data-score) "%"; position: absolute; top: -30px; left: 50%; 
+            transform: translateX(-50%); background: var(--text-main); color: var(--bg-main); 
+            padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; white-space: nowrap; 
+            z-index: 10;
+        }
+        .chart-label { 
+            font-size: 0.75em; color: var(--text-sub); margin-top: 8px; 
+            white-space: nowrap; font-weight: bold; 
+        }
+        /* ボタンレイアウト用 */
+        .action-buttons { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .btn-sm { padding: 8px 12px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+
+    <div class="container" style="position: relative; margin-top: 40px;">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.5em;">📜 過去の模試結果 (最新10件)</h1>
+            <button class="btn btn-back" onclick="goBack()">← メニューへ</button>
+        </div>
+        
+        <!-- 📈 スコア推移グラフ -->
+        <h2 style="font-size: 1.1em; margin-bottom: 15px;">📈 スコアの推移</h2>
+        <div id="score-chart" class="chart-container">
+            <!-- JSで動的にバーを生成 -->
+        </div>
+
+        <h2 style="font-size: 1.1em; margin-bottom: 15px;">📋 履歴一覧</h2>
+        <div id="history-list" style="display: flex; flex-direction: column; gap: 15px;">
+            <!-- JSで動的にリストを生成 -->
+        </div>
+    </div>
+    
+    <script src="js/common.js"></script>
+    <script src="js/exam_history.js"></script>
+</body>
+</html>

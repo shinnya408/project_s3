@@ -1,0 +1,282 @@
+/* --- CSS変数 (ダークモード対応) --- */
+:root {
+    --bg-color: #f8fafc;
+    --text-color: #334155;
+    --heading-color: #0f172a;
+    --card-bg: #ffffff;
+    --border-color: #cbd5e1;
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --input-bg: #ffffff;
+}
+
+[data-theme="dark"] {
+    --bg-color: #0f172a;
+    --text-color: #cbd5e1;
+    --heading-color: #f8fafc;
+    --card-bg: #1e293b;
+    --border-color: #475569;
+    --input-bg: #334155;
+}
+
+body { 
+    font-family: 'Helvetica Neue', Arial, sans-serif; 
+    background-color: var(--bg-color); 
+    color: var(--text-color); 
+    margin: 0; 
+    padding: 20px; 
+}
+
+h1, h2, h3, h4 { color: var(--heading-color); }
+
+.header-container {
+    max-width: 1200px; 
+    margin: 0 auto 20px auto; 
+    display: flex; 
+    justify-content: space-between;
+    align-items: center;
+}
+
+.back-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: bold;
+}
+.back-link:hover { text-decoration: underline; }
+
+.container { 
+    display: flex; 
+    gap: 20px; 
+    max-width: 1200px; 
+    margin: 0 auto; 
+    align-items: flex-start; 
+}
+
+@media (max-width: 768px) {
+    .container { flex-direction: column; }
+}
+
+.sidebar { 
+    flex: 1; 
+    background-color: var(--card-bg); 
+    padding: 20px; 
+    border-radius: 8px; 
+    border: 1px solid var(--border-color); 
+    min-width: 250px; 
+}
+
+.editor-area { 
+    flex: 2; 
+    background-color: var(--card-bg); 
+    padding: 20px; 
+    border-radius: 8px; 
+    border: 1px solid var(--border-color); 
+    width: 100%; 
+    box-sizing: border-box; 
+}
+
+select, input[type="text"], textarea { 
+    width: 100%; 
+    padding: 8px; 
+    margin-top: 5px; 
+    background-color: var(--input-bg); 
+    color: var(--text-color); 
+    border: 1px solid var(--border-color); 
+    border-radius: 4px; 
+    box-sizing: border-box; 
+}
+
+.readonly-input {
+    background-color: var(--bg-color) !important;
+}
+
+.question-list { 
+    list-style: none; 
+    padding: 0; 
+    max-height: 600px; 
+    overflow-y: auto; 
+}
+
+.question-list li { 
+    padding: 10px; 
+    border-bottom: 1px solid var(--border-color); 
+    cursor: pointer; 
+}
+
+.question-list li:hover { 
+    background-color: var(--primary-color); 
+    color: white; 
+}
+
+.tabs { 
+    display: flex; 
+    margin-bottom: 20px; 
+    border-bottom: 2px solid var(--border-color); 
+}
+
+.tab-btn { 
+    background: none; 
+    border: none; 
+    padding: 10px 20px; 
+    cursor: pointer; 
+    color: var(--text-color); 
+    font-weight: bold; 
+    font-size: 1rem; 
+}
+
+.tab-btn.active { 
+    color: var(--primary-color); 
+    border-bottom: 3px solid var(--primary-color); 
+    margin-bottom: -2px; 
+}
+
+.form-group { margin-bottom: 15px; }
+
+.row-group { 
+    display: flex; 
+    gap: 10px; 
+}
+.row-group > div { flex: 1; }
+
+.image-preview { 
+    max-width: 200px; 
+    max-height: 150px; 
+    display: block; 
+    margin-top: 10px; 
+    border-radius: 4px; 
+}
+
+.options-header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+}
+
+.options-container { 
+    border-left: 3px solid var(--primary-color); 
+    padding-left: 15px; 
+    margin-bottom: 20px; 
+}
+
+.option-item { 
+    background-color: var(--bg-color); 
+    padding: 10px; 
+    margin-bottom: 10px; 
+    border-radius: 4px; 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+}
+
+.option-item input[type="text"] { 
+    flex: 1; 
+    margin: 0; 
+}
+
+.is-correct-label { 
+    color: var(--success-color); 
+    font-weight: bold; 
+    cursor: pointer; 
+    white-space: nowrap; 
+}
+
+.btn { 
+    padding: 10px 15px; 
+    border: none; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    color: white; 
+    background-color: var(--primary-color); 
+}
+.btn-success { background-color: var(--success-color); }
+.btn-danger { background-color: var(--danger-color); padding: 6px 10px; }
+.btn-outline { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); }
+
+.full-width { width: 100%; }
+
+.info-box {
+    background-color: var(--bg-color); 
+    padding: 10px; 
+    border-radius: 4px; 
+    margin-bottom: 15px; 
+    font-size: 0.9rem;
+}
+
+#tsv-input { 
+    font-family: monospace; 
+    white-space: pre; 
+    overflow-x: auto; 
+    font-size: 0.9rem; 
+}
+
+.preview-text {
+    margin-bottom: 15px; 
+    color: var(--success-color); 
+    font-weight: bold;
+}
+
+.tab-content {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.checkbox-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.checkbox-list-item:hover {
+    background-color: var(--border-color);
+}
+
+/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+.toast-notification {
+    visibility: hidden;
+    min-width: 250px;
+    
+    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #333333);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    padding: 15px 20px;
+    position: fixed;
+    z-index: 9999;
+    
+    /* ① 画面の右下に配置 */
+    right: 20px;
+    bottom: 20px;
+    
+    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
+    transform: translateX(120%);
+    opacity: 0;
+    
+    /* 滑らかなスライドアニメーションの設定 */
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+    
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+/* 表示された時のクラス（元の位置に戻ってくる） */
+.toast-notification.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0); /* 定位置へスライドイン */
+}
+
+/* ダークモード時の影の調整 */
+[data-theme="dark"] .toast-notification {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}

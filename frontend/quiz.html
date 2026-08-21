@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>確認モード - 問題プレイヤー</title>
+    <link rel="stylesheet" href="css/quiz.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <!-- 上部バー -->
+    <header class="top-bar">
+        <div class="header-left">
+            <!-- ★ 修正：直接URLを書かず、quiz.js の goBack() 関数を呼ぶように変更 -->
+            <button onclick="goBack()" class="btn-text">← メニューへ</button>
+            <span id="progress-text" class="progress-badge">1 / 10</span>
+        </div>
+        <div class="header-right">
+            <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+        </div>
+    </header>
+
+    <!-- メインエリア（左右ボタン ＋ コンテンツ） -->
+    <div class="main-wrapper">
+        <!-- 左：戻るボタン -->
+        <button id="btn-prev-side" class="side-nav-btn prev-btn" onclick="prevQuestion()">＜</button>
+
+        <!-- コンテンツ中央 -->
+        <div class="content-area">
+            <!-- 問題文エリア -->
+            <div class="question-box">
+                <div class="q-header">
+                    <span id="q-id-badge" class="badge">ID: --</span>
+                    <span id="q-category-badge" class="badge category-badge">カテゴリ未設定</span>
+                    <!-- 過去の正誤を表示するバッジ（将来実装用） -->
+                    <span id="q-history-badge" class="badge" style="margin-left: auto; background-color: var(--bg-main); display: none;">
+                        前回: ⭕ 正解
+                    </span>
+                </div>
+                <h3 id="q-text" class="q-text">問題文を読み込み中...</h3>
+                <img id="q-image" class="q-image hidden" src="" alt="問題画像">
+            </div>
+
+            <!-- 解答エリア（四択 / D&D） -->
+            <div id="play-area" class="play-area">
+                <!-- JSで四択やD&DのUIがここに描画されます -->
+            </div>
+
+            <!-- 解説エリア（解答後に表示） -->
+            <div id="explanation-area" class="explanation-area hidden">
+                <h2 id="result-title" class="result-title"></h2>
+                <div id="exp-text" class="exp-text"></div>
+                <img id="exp-image" class="q-image hidden" src="">
+            </div>
+        </div>
+
+        <!-- 右：次へボタン -->
+        <button id="btn-next-side" class="side-nav-btn next-btn" onclick="nextQuestion()">＞</button>
+    </div>
+
+    <!-- 下部固定バー -->
+    <footer class="bottom-bar">
+        <div class="bottom-bar-inner">
+            <button id="btn-shuffle" class="action-btn" onclick="toggleShuffle()">🔀 ランダム</button>
+            <button class="action-btn" onclick="openQuizTagModal()">⭐ お気に入り</button>
+            <button class="action-btn" onclick="showListModal()">📋 一覧</button>
+            <button id="btn-prev-bottom" class="action-btn" onclick="prevQuestion()">＜ 戻る</button>
+            <button id="btn-next-bottom" class="action-btn" onclick="nextQuestion()">次へ ＞</button>
+            <button id="btn-submit" class="action-btn submit-btn" onclick="submitAnswer()">解答する</button>
+        </div>
+    </footer>
+
+    <!-- ＝＝＝ モーダル群 ＝＝＝ -->
+    
+    <!-- 問題一覧モーダル -->
+    <div id="list-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>問題一覧</h2>
+                <button class="close-btn" onclick="closeModal('list-modal')">×</button>
+            </div>
+            <div id="list-container" class="modal-body">
+                <!-- JSでカテゴリごとに一覧が生成されます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ★ 変更：タグ追加・解除モーダル -->
+    <div id="quiz-tag-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">⭐ お気に入りの追加・解除</h3>
+                <button class="close-btn" onclick="closeModal('quiz-tag-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="quiz-new-tag-input" placeholder="新しいタグ名を入力" class="input-text" style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-main); color: var(--text-main);">
+                    <button class="btn-primary" style="padding: 8px 15px; border: none; border-radius: 4px; background: var(--primary); color: white; cursor: pointer; font-weight: bold;" onclick="addNewTagFromQuiz()">作成</button>
+                </div>
+                
+                <p style="font-size: 0.9em; color: var(--text-sub); margin-top: 0;">この問題に付けるタグをチェックしてください。</p>
+                <div id="quiz-tag-checkboxes" class="checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- JSで動的に生成 -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px; border-top: 1px solid var(--border); text-align: right;">
+                <button class="btn" style="background: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;" onclick="saveQuizTags()">保存して閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⌨️ ショートカット一覧（ヘルプ）モーダル -->
+    <div id="shortcut-help-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">⌨️ キーボードショートカット</h3>
+                <button class="close-btn" onclick="closeAllModals()">×</button>
+            </div>
+            <div class="modal-body" style="line-height: 1.8;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">移動・選択</p>
+                        <p><strong>← / →</strong> : 前へ / 次へ</p>
+                        <p><strong>↑ / ↓</strong> : 選択肢の移動</p>
+                        <p><strong>1 〜 0</strong> : 選択肢を直接選択</p>
+                    </div>
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">アクション</p>
+                        <p><strong>A / Space</strong> : 解答する</p>
+                        <p><strong>F</strong> : フラグON / OFF</p>
+                        <p><strong>R</strong> : ランダム切替</p>
+                    </div>
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">各種画面</p>
+                        <p><strong>S</strong> : お気に入り操作 (Star)</p>
+                        <p><strong>L</strong> : 問題一覧 (List)</p>
+                        <p><strong>M</strong> : メモ帳 (Memo) ※模試用</p>
+                        <p><strong>Esc</strong> : 画面を閉じる</p>
+                    </div>
+                    <div>
+                        <p style="margin: 5px 0; color: var(--text-sub); font-size: 0.9em; border-bottom: 1px solid var(--border);">システム</p>
+                        <p><strong>B</strong> : メニューへ戻る</p>
+                        <p><strong>T</strong> : テーマ切替 (Theme)</p>
+                        <p><strong>?</strong> : このヘルプを表示</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/quiz.js"></script>
+</body>
+</html>

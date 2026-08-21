@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>模試設定 (2/2) - オプション</title>
+    <link rel="stylesheet" href="css/exam_config.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+    <div class="container">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.5em;">模試オプション</h1>
+            <span class="step-badge">Step 2 / 2</span>
+        </div>
+
+        <!-- 時間制限 -->
+        <div class="form-group">
+            <label class="form-label">時間制限</label>
+            <div class="radio-group" style="flex-direction: column;">
+                <label class="check-label" id="default-time-label">
+                    <input type="radio" name="time_limit" value="default" checked> デフォルト (システム設定：60分)
+                </label>
+                <label class="check-label">
+                    <input type="radio" name="time_limit" value="custom"> 指定する: 
+                    <input type="number" id="custom-time" class="form-control" style="width: 80px; padding: 5px; margin-left: 10px;" placeholder="分" min="1"> 分
+                </label>
+                <label class="check-label">
+                    <input type="radio" name="time_limit" value="none"> 無制限
+                </label>
+            </div>
+        </div>
+
+        <!-- 時間切れの挙動 -->
+        <div class="form-group">
+            <label class="form-label">時間切れの挙動</label>
+            <div class="radio-group">
+                <label class="check-label"><input type="radio" name="timeout_action" value="force_end" checked> 強制終了 (そこまでで採点)</label>
+                <label class="check-label"><input type="radio" name="timeout_action" value="continue"> 継続 (解答を続ける)</label>
+            </div>
+        </div>
+
+        <!-- 出題数 -->
+        <div class="form-group">
+            <label class="form-label">出題数</label>
+            <div class="radio-group" style="flex-direction: column;">
+                <label class="check-label" id="default-count-label">
+                    <input type="radio" name="q_count" value="default" checked> デフォルト (システム設定：20問)
+                </label>
+                <label class="check-label">
+                    <input type="radio" name="q_count" value="custom"> 指定する: 
+                    <input type="number" id="custom-count" class="form-control" style="width: 80px; padding: 5px; margin-left: 10px;" placeholder="問" min="1"> 問
+                </label>
+                <label class="check-label">
+                    <input type="radio" name="q_count" value="all"> 全問出題
+                </label>
+            </div>
+        </div>
+
+        <div class="footer-actions">
+            <button class="btn btn-back" onclick="goBack()">← 戻る (フィルタ設定)</button>
+            <button class="btn btn-next" onclick="startExam()">模試を開始する 🚀</button>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/exam_options.js"></script>
+</body>
+</html>

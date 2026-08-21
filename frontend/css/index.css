@@ -1,0 +1,191 @@
+/* --- CSS変数 (ダークモード対応) --- */
+:root {
+    --bg-color: #f8fafc;
+    --text-color: #334155;
+    --heading-color: #0f172a;
+    --card-bg: #ffffff;
+    --card-shadow: rgba(0,0,0,0.05);
+    --border-color: #e2e8f0;
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --format-bg: #e2e8f0;
+    --format-text: #64748b;
+}
+
+[data-theme="dark"] {
+    --bg-color: #0f172a;
+    --text-color: #cbd5e1;
+    --heading-color: #f8fafc;
+    --card-bg: #1e293b;
+    --card-shadow: rgba(0,0,0,0.4);
+    --border-color: #334155;
+    --primary-color: #818cf8;
+    --primary-hover: #6366f1;
+    --format-bg: #334155;
+    --format-text: #94a3b8;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.header-container {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    border-bottom: 3px solid var(--primary-color);
+    padding-bottom: 10px;
+}
+
+h1 {
+    color: var(--heading-color);
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.theme-toggle-btn {
+    background: transparent;
+    border: 2px solid var(--border-color);
+    color: var(--text-color);
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+.theme-toggle-btn:hover { background-color: var(--border-color); }
+
+/* 管理者ボタン用デザイン */
+.admin-btn {
+    background-color: #10b981; /* 緑色 */
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.admin-btn:hover { background-color: #059669; }
+
+#workbook-list {
+    list-style-type: none;
+    padding: 0;
+    width: 100%;
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+}
+
+@media (min-width: 600px) {
+    #workbook-list {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    h1 { font-size: 2rem; }
+}
+
+.workbook-item {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px var(--card-shadow);
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.2s, background-color 0.3s;
+}
+.workbook-item:hover { transform: translateY(-2px); }
+
+.workbook-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--heading-color);
+}
+.workbook-format {
+    font-size: 0.9rem;
+    color: var(--format-text);
+    background-color: var(--format-bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 8px;
+}
+
+.start-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.start-btn:hover { background-color: var(--primary-hover); }
+
+.loading {
+    text-align: center;
+    color: var(--format-text);
+    grid-column: 1 / -1;
+}
+
+/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+.toast-notification {
+    visibility: hidden;
+    min-width: 250px;
+    
+    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #333333);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    padding: 15px 20px;
+    position: fixed;
+    z-index: 9999;
+    
+    /* ① 画面の右下に配置 */
+    right: 20px;
+    bottom: 20px;
+    
+    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
+    transform: translateX(120%);
+    opacity: 0;
+    
+    /* 滑らかなスライドアニメーションの設定 */
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+    
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+/* 表示された時のクラス（元の位置に戻ってくる） */
+.toast-notification.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0); /* 定位置へスライドイン */
+}
+
+/* ダークモード時の影の調整 */
+[data-theme="dark"] .toast-notification {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}

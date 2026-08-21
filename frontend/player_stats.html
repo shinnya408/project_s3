@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成績データ</title>
+    <link rel="stylesheet" href="css/player_stats.css">
+    <!-- PWA用マニフェストの読み込み -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+
+    <div class="container" style="position: relative; margin-top: 40px;">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.5em;">📊 成績データ</h1>
+            <button class="btn btn-back" onclick="goBack()">← メニューへ</button>
+        </div>
+
+        <!-- ★ 追加：ストリークと累計データ -->
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="card-icon">🔥</div>
+                <div class="card-info">
+                    <div class="card-title">連続学習日数</div>
+                    <div class="card-value" id="streak-days">-- 日</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="card-icon">📚</div>
+                <div class="card-info">
+                    <div class="card-title">累計解答数</div>
+                    <div class="card-value" id="total-answers">-- 問</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 凡例（レジェンド） -->
+        <div class="stats-legend">
+            <div class="legend-item"><span class="color-box bg-red"></span> 🟥 レッドカード (連続不正解)</div>
+            <div class="legend-item"><span class="color-box bg-yellow"></span> 🟨 イエローカード (不正解)</div>
+            <div class="legend-item"><span class="color-box bg-goal"></span> ⚽ ゴール (正解)</div>
+            <div class="legend-item"><span class="color-box bg-hat"></span> 🎩 ハットトリック (連続正解)</div>
+            <div class="legend-item"><span class="color-box bg-bench"></span> 🪑 ベンチ (未着手)</div>
+        </div>
+
+        <!-- 総合データエリア -->
+        <div class="form-group" style="background: rgba(59, 130, 246, 0.05); padding: 25px; border-radius: 12px; border: 1px solid var(--border);">
+            <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3em;">🌍 全体の総合ステータス</h2>
+            <div id="overall-stats-container"></div>
+        </div>
+
+        <!-- カテゴリ別データエリア -->
+        <div class="form-group">
+            <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3em;">📁 カテゴリ別のステータス</h2>
+            <div id="category-stats-container" style="display: flex; flex-direction: column; gap: 25px;"></div>
+        </div>
+
+        <!-- ★ 追加：タグ別データエリア -->
+        <div class="form-group">
+            <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3em;">🏷️ タグ別のステータス</h2>
+            <div id="tag-stats-container" style="display: flex; flex-direction: column; gap: 25px;"></div>
+        </div>
+    </div>
+
+    <!-- ツールチップ -->
+    <div id="stats-tooltip" class="tooltip hidden"></div>
+
+    <script src="js/common.js"></script>
+    <script src="js/player_stats.js"></script>
+</body>
+</html>

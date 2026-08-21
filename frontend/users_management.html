@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ユーザー管理</title>
+    <link rel="stylesheet" href="css/exam_config.css">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="toast-notification"></div>
+    
+    <!-- ★ 追加：テーマ切り替えボタン -->
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+
+    <div class="container" style="max-width: 900px; margin-top: 40px;">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.5em;">👥 ユーザー管理ダッシュボード</h1>
+            <button class="btn btn-outline" onclick="window.location.href='index.html'">← トップへ戻る</button>
+        </div>
+        
+        <p style="color: var(--text-sub);">
+            ユーザーの権限変更や、各ユーザーの問題集の進捗（成績データ）を確認できます。
+        </p>
+
+        <div style="margin-bottom: 15px; background: var(--bg-card); padding: 15px; border-radius: 8px;">
+            <label style="font-weight: bold;">📊 進捗を確認したい問題集を選択:</label>
+            <select id="workbook-select" class="form-control" style="max-width: 300px; margin-top: 5px;">
+                <option value="">読込中...</option>
+            </select>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <thead>
+                <tr style="background: var(--bg-main); border-bottom: 2px solid var(--border);">
+                    <th style="padding: 10px; text-align: left;">ID</th>
+                    <th style="padding: 10px; text-align: left;">ユーザー名</th>
+                    <th style="padding: 10px; text-align: left;">メールアドレス</th>
+                    <th style="padding: 10px; text-align: left;">権限</th>
+                    <th style="padding: 10px; text-align: center;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="user-list">
+                <tr><td colspan="5" style="text-align: center; padding: 20px;">読込中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <script src="js/common.js"></script>
+    <script src="js/users_management.js"></script>
+</body>
+</html>

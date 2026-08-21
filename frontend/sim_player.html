@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シミュレーション演習 - プレイヤー</title>
+    <link rel="stylesheet" href="css/sim_player.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+</head>
+<body>
+    <div id="toast-container" class="toast-notification"></div>
+
+    <header class="sim-header">
+        <div class="header-left">
+            <button class="btn-text" onclick="goBack()">← メニューへ</button>
+            <h2 id="sim-title" class="sim-page-title">シミュレーション演習</h2>
+        </div>
+        
+        <div class="mode-tabs">
+            <button id="tab-btn-practice" class="mode-tab-btn active" onclick="switchMode('practice')">📖 練習モード</button>
+            <button id="tab-btn-exam" class="mode-tab-btn" onclick="switchMode('exam')">🎯 模試モード</button>
+            <button id="tab-btn-free" class="mode-tab-btn free-mode-btn" onclick="switchMode('free')">🧪 フリーモード</button>
+        </div>
+
+        <div class="header-right">
+            <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
+        </div>
+    </header>
+
+    <main class="sim-main-container">
+        <!-- 【左】シナリオ・タスクパネル -->
+        <section class="left-panel">
+            <div id="problem-panel-content">
+                <div class="question-nav-bar">
+                    <span id="question-progress-text" class="progress-badge">読込中...</span>
+                    <div class="nav-buttons">
+                        <button id="btn-prev-q" class="btn btn-sm btn-outline" onclick="prevQuestion()">＜ 前の問題</button>
+                        <button id="btn-next-q" class="btn btn-sm btn-outline" onclick="nextQuestion()">次の問題 ＞</button>
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <h3 class="panel-subtitle">📋 シナリオ</h3>
+                    <p id="scenario-text" class="scenario-text"></p>
+                    <div id="topology-image-container" class="topology-container hidden">
+                        <img id="topology-image" src="" alt="トポロジ図">
+                    </div>
+                </div>
+
+                <div class="tasks-card">
+                    <div class="tasks-header">
+                        <h3 class="panel-subtitle">📝 タスク一覧</h3>
+                        <span id="total-score-badge" class="score-badge">達成度: 0%</span>
+                    </div>
+                    <div id="tasks-list-container" class="tasks-list"></div>
+                </div>
+
+                <div class="panel-footer" style="margin-top: 20px;">
+                    <button id="btn-submit-sim" class="btn btn-primary full-width" style="padding: 12px; font-size: 1.1em;" onclick="submitSimExam()">この問題の採点をして提出する</button>
+                </div>
+            </div>
+
+            <div id="free-panel-content" class="hidden">
+                <div class="free-info-card">
+                    <h3 class="panel-subtitle">🧪 フリー演習 (サンドボックス)</h3>
+                    <p class="free-desc">自由にコマンド入力とコンフィグ設定を練習できます。</p>
+
+                    <div class="form-group margin-top-20">
+                        <label class="form-label">操作対象デバイス:</label>
+                        <select id="free-device-select" class="form-control" onchange="changeFreeDevice()">
+                            <option value="Router1">Router1 (ルーター)</option>
+                            <option value="Switch1">Switch1 (スイッチ)</option>
+                            <option value="Core_Router">Core_Router (コアルーター)</option>
+                        </select>
+                    </div>
+
+                    <div class="free-actions margin-top-20">
+                        <button class="btn btn-outline full-width" onclick="resetActiveDevice()">↻ デバイスを初期化</button>
+                        <button class="btn btn-outline full-width margin-top-10" onclick="showRunningConfig()">📄 show running-config を実行</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 【右】ターミナルパネル -->
+        <section class="right-panel">
+            <div class="cli-container">
+                <div class="cli-header">
+                    <div class="cli-title">
+                        <span class="cli-dot red"></span>
+                        <span class="cli-dot yellow"></span>
+                        <span class="cli-dot green"></span>
+                        <span id="cli-device-title" class="cli-device-name">Virtual Console</span>
+                    </div>
+                    <div class="cli-header-actions">
+                        <button class="cli-action-btn" onclick="clearConsoleOutput()">画面クリア</button>
+                    </div>
+                </div>
+
+                <div id="cli-terminal" class="cli-terminal" onclick="focusConsoleInput()">
+                    <div id="cli-output" class="cli-output"></div>
+                    <div class="cli-input-line">
+                        <span id="cli-prompt" class="cli-prompt">Router&gt;</span>
+                        <input type="text" id="cli-input" class="cli-input-field" autocomplete="off" spellcheck="false" autofocus>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 結果モーダル -->
+    <div id="sim-result-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2>📊 採点結果</h2>
+                <button class="close-btn" onclick="closeModal('sim-result-modal')">×</button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="result-score-circle">
+                    <span id="modal-score-percent">0%</span>
+                </div>
+                <h3 id="modal-score-detail" style="margin-top: 15px;">0 / 0 点</h3>
+                <p id="modal-score-message" style="color: var(--text-sub); margin-top: 10px;"></p>
+                
+                <!-- ★ 追加: 不足設定リスト表示エリア -->
+                <div id="modal-missing-settings" class="hidden" style="margin-top: 15px; text-align: left; background: #fef2f2; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5;">
+                    <h4 style="color: #b91c1c; margin-top: 0; margin-bottom: 8px; font-size: 0.95em;">⚠️ 以下の設定が不足しています</h4>
+                    <ul id="modal-missing-list" style="margin: 0; padding-left: 20px; font-size: 0.85em; color: #7f1d1d; line-height: 1.5;"></ul>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px; border-top: 1px solid var(--border);">
+                <button class="btn btn-outline" onclick="closeModal('sim-result-modal')">閉じる</button>
+                <button class="btn btn-primary" onclick="nextQuestionAfterSubmit()">次の問題へ ＞</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/simulator_engine.js"></script>
+    <script src="js/sim_player.js"></script>
+</body>
+</html>

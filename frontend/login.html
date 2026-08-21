@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - 資格試験対策アプリ</title>
+    <link rel="stylesheet" href="css/exam_config.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg-main, #f8fafc);
+            margin: 0;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 30px;
+            background: var(--bg-card, #ffffff);
+            border-radius: 12px;
+            border: 1px solid var(--border, #e2e8f0);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border, #e2e8f0);
+        }
+        .auth-tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            font-weight: bold;
+            font-size: 1em;
+            color: var(--text-sub, #64748b);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+        .auth-tab-btn.active {
+            color: var(--primary, #3b82f6);
+            border-bottom-color: var(--primary, #3b82f6);
+        }
+    </style>
+</head>
+<body>
+    <div id="toast-container" class="toast-notification"></div>
+
+    <div class="login-card">
+        <h2 style="text-align: center; margin-top: 0; margin-bottom: 20px;">🎓 学習管理システム</h2>
+
+        <!-- タブ切り替え（ログイン / 新規登録） -->
+        <div class="auth-tabs">
+            <button id="tab-login" class="auth-tab-btn active" type="button" onclick="switchAuthMode('login')">ログイン</button>
+            <button id="tab-register" class="auth-tab-btn" type="button" onclick="switchAuthMode('register')">新規登録</button>
+        </div>
+
+        <!-- ログインフォーム -->
+        <!-- ★ name 属性と autocomplete 属性を付与してブラウザの候補表示・Enter送信を強化 -->
+        <form id="login-form" action="#" autocomplete="on" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label" for="login-email">メールアドレス</label>
+                <input type="email" id="login-email" name="email" class="form-control" placeholder="example@mail.com" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="login-password">パスワード</label>
+                <input type="password" id="login-password" name="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                <input type="checkbox" id="keep-logged-in" name="keep-logged-in" checked style="transform: scale(1.2); cursor: pointer;">
+                <label for="keep-logged-in" style="font-size: 0.9em; cursor: pointer; color: var(--text-sub);">ログイン状態を保持する</label>
+            </div>
+            <button type="submit" id="btn-login-submit" class="btn btn-next full-width" style="margin-top: 15px;">ログイン ＞</button>
+            <div style="margin-top: 15px; text-align: center; font-size: 0.85em;">
+                <a href="reset_password.html" style="color: var(--text-sub);">パスワードをお忘れの方はこちら</a>
+            </div>
+        </form>
+
+        <!-- 新規登録フォーム -->
+        <form id="register-form" action="#" autocomplete="on" style="display: none;" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label class="form-label" for="reg-username">ユーザー名</label>
+                <input type="text" id="reg-username" name="username" class="form-control" placeholder="山田 太郎" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="reg-email">メールアドレス</label>
+                <input type="email" id="reg-email" name="email" class="form-control" placeholder="example@mail.com" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="reg-password">パスワード</label>
+                <input type="password" id="reg-password" name="password" class="form-control" placeholder="8文字以上" required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit" id="btn-reg-submit" class="btn btn-next full-width" style="margin-top: 15px; background-color: var(--success, #10b981);">登録して開始 ＞</button>
+        </form>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/login.js"></script>
+</body>
+</html>

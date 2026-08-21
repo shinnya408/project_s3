@@ -1,0 +1,135 @@
+/* player_stats.css */
+:root {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #1e293b;
+    --text-sub: #64748b;
+    --border: #e2e8f0;
+    --primary: #3b82f6;
+    
+    /* ステータスカラー */
+    --c-red: #ef4444;
+    --c-yellow: #f59e0b;
+    --c-goal: #10b981;
+    --c-hat: #3b82f6;
+    --c-bench: #cbd5e1;
+}
+
+[data-theme="dark"] {
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --border: #334155;
+    
+    --c-bench: #475569; /* ダークモード用ベンチカラー */
+}
+
+body { font-family: sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; padding: 20px; transition: 0.3s; }
+.container { max-width: 800px; margin: 0 auto; }
+.hidden { display: none !important; opacity: 0; pointer-events: none; }
+
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid var(--border); padding-bottom: 15px; }
+.btn { padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; border: none; }
+.btn-back { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); }
+.theme-toggle-btn { position: absolute; top: 0; right: 0; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-main); }
+.form-group { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+
+/* 凡例（レジェンド） */
+.stats-legend { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); }
+.legend-item { display: flex; align-items: center; font-size: 0.9em; font-weight: bold; }
+.color-box { width: 16px; height: 16px; border-radius: 4px; margin-right: 8px; }
+
+/* カラークラス */
+.bg-red { background-color: var(--c-red); }
+.bg-yellow { background-color: var(--c-yellow); }
+.bg-goal { background-color: var(--c-goal); }
+.bg-hat { background-color: var(--c-hat); }
+.bg-bench { background-color: var(--c-bench); }
+
+/* 積み上げ棒グラフ */
+.stat-bar-wrapper { width: 100%; }
+.stat-bar-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
+.stat-title { font-weight: bold; font-size: 1.1em; }
+.stat-total { font-size: 0.9em; color: var(--text-sub); font-weight: bold; }
+.stat-bar { display: flex; width: 100%; height: 30px; border-radius: 15px; overflow: hidden; background: var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+.stat-segment { height: 100%; transition: opacity 0.2s, transform 0.2s; cursor: crosshair; }
+.stat-segment:hover { opacity: 0.8; transform: scaleY(1.1); }
+
+/* ツールチップ（吹き出し） */
+.tooltip {
+    position: fixed;
+    background: rgba(15, 23, 42, 0.95);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 0.95em;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2);
+    transform: translate(-50%, -130%);
+    transition: opacity 0.1s;
+    white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+/* スマホタップ時に残るのを防ぐために、bodyタップで消す用 */
+body.tooltip-active .tooltip { opacity: 1; }
+
+/* サマリーカード（ストリーク等） */
+.summary-cards { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+.summary-card { flex: 1; min-width: 150px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+.card-icon { font-size: 2.5em; line-height: 1; }
+.card-title { font-size: 0.85em; color: var(--text-sub); font-weight: bold; }
+.card-value { font-size: 1.5em; font-weight: bold; color: var(--text-main); margin-top: 5px; }
+
+/* 弱点克服ボタン */
+.btn-weakness { font-size: 0.8em; background: #fef2f2; color: #ef4444; border: 1px solid #fca5a5; padding: 4px 10px; border-radius: 20px; cursor: pointer; margin-left: 10px; font-weight: bold; transition: 0.2s; }
+.btn-weakness:hover { background: #ef4444; color: white; }
+
+[data-theme="dark"] .btn-weakness { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+[data-theme="dark"] .btn-weakness:hover { background: #ef4444; color: white; }
+
+/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+.toast-notification {
+    visibility: hidden;
+    min-width: 250px;
+    
+    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #333333);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    padding: 15px 20px;
+    position: fixed;
+    z-index: 9999;
+    
+    /* ① 画面の右下に配置 */
+    right: 20px;
+    bottom: 20px;
+    
+    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
+    transform: translateX(120%);
+    opacity: 0;
+    
+    /* 滑らかなスライドアニメーションの設定 */
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+    
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+/* 表示された時のクラス（元の位置に戻ってくる） */
+.toast-notification.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0); /* 定位置へスライドイン */
+}
+
+/* ダークモード時の影の調整 */
+[data-theme="dark"] .toast-notification {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
