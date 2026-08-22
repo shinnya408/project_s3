@@ -88,14 +88,24 @@
             <div class="form-group">
                 <label class="form-label" for="reg-username">ユーザー名</label>
                 <input type="text" id="reg-username" name="username" class="form-control" placeholder="山田 太郎" required autocomplete="username">
+                <p style="font-size: 0.8em; color: var(--text-sub); margin-top: 5px; margin-bottom: 0; line-height: 1.4;">
+                    ※フルネームで登録してください。<br>
+                    誰か確認できない名前だとアカウントが削除される可能性がございます。
+                </p>
             </div>
             <div class="form-group">
                 <label class="form-label" for="reg-email">メールアドレス</label>
                 <input type="email" id="reg-email" name="email" class="form-control" placeholder="example@mail.com" required autocomplete="email">
+                <p style="font-size: 0.8em; color: var(--text-sub); margin-top: 5px; margin-bottom: 0; line-height: 1.4;">
+                    ※登録したメールアドレスはユーザーを特定するための情報として紐づけられるのみで、メールの送信など他の目的には一切使用されません。
+                </p>
             </div>
             <div class="form-group">
                 <label class="form-label" for="reg-password">パスワード</label>
                 <input type="password" id="reg-password" name="password" class="form-control" placeholder="8文字以上" required minlength="8" autocomplete="new-password">
+                <p style="font-size: 0.8em; color: var(--text-sub); margin-top: 5px; margin-bottom: 0; line-height: 1.4;">
+                    ※登録したパスワードは本システムのログインのみに使用され、他の目的には一切使用されません。
+                </p>
             </div>
             <button type="submit" id="btn-reg-submit" class="btn btn-next full-width" style="margin-top: 15px; background-color: var(--success, #10b981);">登録して開始 ＞</button>
         </form>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'project_s3_v0.0'; // ★バージョンを上げました
+const CACHE_NAME = 'project_s3_v0.00'; // ★バージョンを上げました
 const urlsToCache = [
   './',
   './exam_filter.html',
@@ -14,7 +14,6 @@ const urlsToCache = [
   './player_stats.html',
   './question_editor.html',
   './quiz.html',
-  './register.html',
   './reset_password.html',
   './sim_history.html',
   './sim_menu.html',
