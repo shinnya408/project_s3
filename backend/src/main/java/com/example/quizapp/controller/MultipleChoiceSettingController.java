@@ -10,7 +10,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/multiple-choice-settings")
-@CrossOrigin(origins = "https://question-app-3rn.pages.dev") 
+@CrossOrigin(origins = "*") 
 @RequiredArgsConstructor
 public class MultipleChoiceSettingController {
 

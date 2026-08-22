@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class UserController {
 

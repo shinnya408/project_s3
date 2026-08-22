@@ -18,7 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sim-questions")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "https://question-app-3rn.pages.dev") // 開発用のCORS許可
+@CrossOrigin(origins = "*")
 public class SimQuestionController {
 
     private final SimQuestionRepository simQuestionRepository;

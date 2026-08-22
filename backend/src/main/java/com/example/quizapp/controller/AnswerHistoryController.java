@@ -15,7 +15,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/answer-history")
-@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class AnswerHistoryController {
 

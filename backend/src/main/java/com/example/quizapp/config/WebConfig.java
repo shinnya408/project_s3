@@ -17,7 +17,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("https://question-app-3rn.pages.dev") // あなたのCloudflare URL (末尾の/は無し)
+                .allowedOrigins("*") // あなたのCloudflare URL (末尾の/は無し)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*");
     }

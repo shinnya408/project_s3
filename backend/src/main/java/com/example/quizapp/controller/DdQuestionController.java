@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/dd-questions")
-@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class DdQuestionController {
 

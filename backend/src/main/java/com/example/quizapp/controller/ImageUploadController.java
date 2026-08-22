@@ -10,7 +10,7 @@ import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/upload")
-@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
+@CrossOrigin(origins = "*")
 public class ImageUploadController {
 
     private static final String UPLOAD_DIR = "uploads/";
