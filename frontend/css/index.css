@@ -10,6 +10,8 @@
     --primary-hover: #4f46e5;
     --format-bg: #e2e8f0;
     --format-text: #64748b;
+    --danger: #ef4444; 
+    --success: #10b981;
 }
 
 [data-theme="dark"] {
@@ -23,6 +25,8 @@
     --primary-hover: #6366f1;
     --format-bg: #334155;
     --format-text: #94a3b8;
+    --danger: #f87171;
+    --success: #34d399;
 }
 
 body {
@@ -101,6 +105,20 @@ h1 {
         gap: 20px;
     }
     h1 { font-size: 2rem; }
+}
+
+/* --- スマホ表示用のレイアウト調整 --- */
+@media (max-width: 599px) {
+    .header-container {
+        flex-direction: column; /* 縦並びに変更 */
+        align-items: flex-start; /* 左寄せ */
+        gap: 15px; /* タイトルとボタンの間に余白 */
+    }
+    
+    .header-actions {
+        flex-wrap: wrap; /* ボタンが入り切らない場合は折り返す */
+        width: 100%;
+    }
 }
 
 .workbook-item {
