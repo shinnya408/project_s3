@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!workbookId) {
         alert('問題集が指定されていません。');
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -275,7 +275,7 @@ function startWeaknessMode(title, type, idParam) {
     if (confirm(`「${title}」の弱点問題（レッド・イエロー）${weaknessKeys.length} 問を集中的に特訓しますか？`)) {
         sessionStorage.setItem('weaknessQuestionKeys', JSON.stringify(weaknessKeys));
         
-        let url = `quiz.html?workbookId=${workbookId}&mode=weakness`;
+        let url = `quiz?workbookId=${workbookId}&mode=weakness`;
         if (targetUserId) url += `&targetUserId=${targetUserId}&targetUserName=${encodeURIComponent(targetUserName)}`;
         if (isPreviewMode) url += `&preview=true`;
         
@@ -310,7 +310,7 @@ document.addEventListener('touchstart', (e) => {
 }, { passive: true });
 
 function goBack() { 
-    let url = `player_menu.html?workbookId=${workbookId}`;
+    let url = `player_menu?workbookId=${workbookId}`;
     if (targetUserId) url += `&targetUserId=${targetUserId}&targetUserName=${encodeURIComponent(targetUserName)}`;
     if (isPreviewMode) url += `&preview=true`;
     

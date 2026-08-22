@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!workbookId) {
         alert('エラー: 問題集が指定されていません。');
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -574,7 +574,7 @@ function goBack() {
         window.close();
         return;
     }
-    window.location.href = `sim_menu.html?workbookId=${workbookId}${getExtraParams()}`; 
+    window.location.href = `sim_menu?workbookId=${workbookId}${getExtraParams()}`; 
 }
 
 function escapeHtml(str) {

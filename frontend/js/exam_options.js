@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function goBack() { 
-    window.location.href = `exam_filter.html?workbookId=${workbookId}`; 
+    window.location.href = `exam_filter?workbookId=${workbookId}`; 
 }
 
 // ★ 追加: バックエンドから模試設定を取得してUIに反映する
@@ -81,5 +81,5 @@ function startExam() {
     };
 
     sessionStorage.setItem('examOptionConfig', JSON.stringify(optionConfig));
-    window.location.href = `exam_player.html?workbookId=${workbookId}`;
+    window.location.href = `exam_player?workbookId=${workbookId}`;
 }

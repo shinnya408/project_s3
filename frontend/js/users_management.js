@@ -97,9 +97,9 @@ function viewStats(userId, username) {
 
     // ★ 修正: フォーマットによって遷移先を分岐
     if (format === 'SIMULATION') {
-        window.location.href = `sim_menu.html${queryParams}`;
+        window.location.href = `sim_menu${queryParams}`;
     } else {
         // 通常の選択式・D&D問題集の場合（直接statsではなく、履歴も選べるmenu画面に飛ばすのが自然です）
-        window.location.href = `player_menu.html${queryParams}`;
+        window.location.href = `player_menu${queryParams}`;
     }
 }

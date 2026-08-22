@@ -83,7 +83,7 @@ async function loadFilterData() {
 }
 
 function goBack() { 
-    let url = `player_menu.html?workbookId=${workbookId}`;
+    let url = `player_menu?workbookId=${workbookId}`;
     if (targetUserId) url += `&targetUserId=${targetUserId}&targetUserName=${encodeURIComponent(targetUserName)}`;
     if (isPreviewMode) url += `&preview=true`;
     window.location.href = url;
@@ -165,5 +165,5 @@ function startFavoriteMode() {
     if (targetUserId) extraParams += `&targetUserId=${targetUserId}&targetUserName=${encodeURIComponent(targetUserName)}`;
     if (isPreviewMode) extraParams += `&preview=true`;
 
-    window.location.href = `quiz.html?workbookId=${workbookId}&mode=favorite${extraParams}`;
+    window.location.href = `quiz?workbookId=${workbookId}&mode=favorite${extraParams}`;
 }

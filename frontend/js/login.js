@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userJson = localStorage.getItem('user') || sessionStorage.getItem('user');
     const loginUserId = localStorage.getItem('loginUserId') || sessionStorage.getItem('loginUserId');
     if (userJson || loginUserId) {
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -115,7 +115,7 @@ async function handleLogin(event) {
 
             if (typeof showToast === 'function') showToast('ログインに成功しました！');
             setTimeout(() => {
-                window.location.href = 'index.html';
+                window.location.href = 'index';
             }, 300);
 
         } else {
@@ -168,7 +168,7 @@ async function handleRegister(event) {
             sessionStorage.setItem('loginUserRole', data.role || 'USER');
 
             alert('登録が完了しました！トップページへ移動します。');
-            window.location.href = 'index.html';
+            window.location.href = 'index';
 
         } else {
             alert(data.message || '登録に失敗しました。別のメールアドレスをお試しくいただくか、内容を確認してください。');

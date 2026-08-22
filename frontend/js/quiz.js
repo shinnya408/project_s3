@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (currentQuestions.length === 0) {
                 alert('選択したタグが付いている問題が見つかりませんでした。\nタグ管理画面に戻ります。');
                 // ★ 修正：遷移時にパラメータを引き継ぐ
-                window.location.href = `favorite_filter.html?workbookId=${currentWorkbookId}` + getExtraParams();
+                window.location.href = `favorite_filter?workbookId=${currentWorkbookId}` + getExtraParams();
                 return;
             }
         } 
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (currentQuestions.length === 0) {
                 alert('弱点問題が見つかりませんでした。成績画面に戻ります。');
                 // ★ 修正：遷移時にパラメータを引き継ぐ
-                window.location.href = `player_stats.html?workbookId=${currentWorkbookId}` + getExtraParams();
+                window.location.href = `player_stats?workbookId=${currentWorkbookId}` + getExtraParams();
                 return;
             }
         } else {
@@ -680,7 +680,7 @@ async function saveQuizTags() {
 
 // ★ 追加：HTML側にボタンがあれば呼ばれる戻る処理
 function goBack() {
-    window.location.href = `player_menu.html?workbookId=${currentWorkbookId}` + getExtraParams();
+    window.location.href = `player_menu?workbookId=${currentWorkbookId}` + getExtraParams();
 }
 
 document.addEventListener('keydown', (e) => {

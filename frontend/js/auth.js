@@ -66,7 +66,7 @@ async function login() {
                 localStorage.setItem('loginExpiresAt', expires.getTime());
             }
 
-            window.location.href = 'index.html'; 
+            window.location.href = 'index'; 
         } else {
             if (typeof showToast === 'function') showToast(data.message);
             else alert(data.message);
@@ -117,7 +117,7 @@ async function register() {
             sessionStorage.setItem('loginUserRole', data.role || 'USER');
 
             alert('登録が完了しました！トップページへ移動します。');
-            window.location.href = 'index.html';
+            window.location.href = 'index';
         } else {
             if (typeof showToast === 'function') showToast(data.message);
             else alert(data.message);
@@ -157,7 +157,7 @@ async function resetPassword() {
         
         if (data.success) {
             alert('パスワードの再設定処理を受け付けました。\n入力情報が正しければパスワードが更新されています。');
-            window.location.href = 'login.html';
+            window.location.href = 'login';
         } else {
             if (typeof showToast === 'function') showToast('エラーが発生しました。');
             else alert('エラーが発生しました。');

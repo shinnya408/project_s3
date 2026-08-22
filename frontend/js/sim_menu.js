@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!workbookId) {
         alert('問題集が指定されていません。');
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -58,18 +58,18 @@ function goToMode(targetMode) {
     if (isPreview) extraParams += `&preview=true`;
 
     if (targetMode === 'practice') {
-        window.location.href = `sim_player.html?workbookId=${workbookId}&mode=practice${extraParams}`;
+        window.location.href = `sim_player?workbookId=${workbookId}&mode=practice${extraParams}`;
     } 
     else if (targetMode === 'exam') {
-        window.location.href = `sim_player.html?workbookId=${workbookId}&mode=exam${extraParams}`;
+        window.location.href = `sim_player?workbookId=${workbookId}&mode=exam${extraParams}`;
     }
     else if (targetMode === 'free') {
-        window.location.href = `sim_player.html?workbookId=${workbookId}&mode=free${extraParams}`;
+        window.location.href = `sim_player?workbookId=${workbookId}&mode=free${extraParams}`;
     }
     else if (targetMode === 'stats') {
-        window.location.href = `sim_stats.html?workbookId=${workbookId}${extraParams}`;
+        window.location.href = `sim_stats?workbookId=${workbookId}${extraParams}`;
     }
     else if (targetMode === 'history') {
-        window.location.href = `sim_history.html?workbookId=${workbookId}${extraParams}`;
+        window.location.href = `sim_history?workbookId=${workbookId}${extraParams}`;
     }
 }

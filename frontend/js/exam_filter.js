@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★ プレビューモード・他人のデータ閲覧中は模試フィルタ画面に入れないようにブロック
     if (isPreviewMode || targetUserId) {
         alert('プレビューモード、または他ユーザーの成績確認中は「模試モード」を利用できません。');
-        window.location.href = `player_menu.html?workbookId=${workbookId}`;
+        window.location.href = `player_menu?workbookId=${workbookId}`;
         return;
     }
 
@@ -172,7 +172,7 @@ async function loadFilterData() {
 }
 
 function goBack() { 
-    window.location.href = `player_menu.html?workbookId=${workbookId}`; 
+    window.location.href = `player_menu?workbookId=${workbookId}`; 
 }
 
 function goToNext() {
@@ -194,5 +194,5 @@ function goToNext() {
     };
 
     sessionStorage.setItem('examFilterConfig', JSON.stringify(filterConfig));
-    window.location.href = `exam_options.html?workbookId=${workbookId}`;
+    window.location.href = `exam_options?workbookId=${workbookId}`;
 }

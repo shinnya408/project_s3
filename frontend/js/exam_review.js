@@ -25,7 +25,7 @@ let questionTags = {};
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     const resultStr = sessionStorage.getItem('examResults');
-    if (!resultStr) { alert('採点データが見つかりません。メニューに戻ります。'); window.location.href = `player_menu.html?workbookId=${workbookId}${getExtraParams()}`; return; }
+    if (!resultStr) { alert('採点データが見つかりません。メニューに戻ります。'); window.location.href = `player_menu?workbookId=${workbookId}${getExtraParams()}`; return; }
 
     const data = JSON.parse(resultStr);
     examQuestions = data.questions;
@@ -396,4 +396,4 @@ async function saveQuizTags() {
     }
 }
 
-function goBackToResult() { window.location.href = `exam_result.html?workbookId=${workbookId}${getExtraParams()}`; }
+function goBackToResult() { window.location.href = `exam_result?workbookId=${workbookId}${getExtraParams()}`; }

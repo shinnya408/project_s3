@@ -26,10 +26,10 @@ let currentIndex = 0; // タグ編集用
 
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    if (!workbookId) { alert('エラー：問題集が指定されていません。'); window.location.href = 'index.html'; return; }
+    if (!workbookId) { alert('エラー：問題集が指定されていません。'); window.location.href = 'index'; return; }
     
     const resultStr = sessionStorage.getItem('examResults');
-    if (!resultStr) { alert('採点データが見つかりません。メニューに戻ります。'); window.location.href = `player_menu.html?workbookId=${workbookId}${getExtraParams()}`; return; }
+    if (!resultStr) { alert('採点データが見つかりません。メニューに戻ります。'); window.location.href = `player_menu?workbookId=${workbookId}${getExtraParams()}`; return; }
 
     const data = JSON.parse(resultStr);
     examQuestions = data.questions;
@@ -44,9 +44,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // タグ情報の読み込み（モーダル用）
     await loadTagsFromAPI();
 
-    const historyBtn = document.querySelector('button[onclick*="exam_history.html"]');
+    const historyBtn = document.querySelector('button[onclick*="exam_history"]');
     if (historyBtn) {
-        historyBtn.setAttribute('onclick', `window.location.href='exam_history.html?workbookId=${workbookId}${getExtraParams()}'`);
+        historyBtn.setAttribute('onclick', `window.location.href='exam_history?workbookId=${workbookId}${getExtraParams()}'`);
     }
 
     gradeExam();
@@ -224,7 +224,7 @@ function startRevengeMode() {
     if (confirm(`間違えた ${incorrectQuestionsToRevenge.length} 問のみで「リベンジ受験」を開始しますか？\n記憶が新しいうちに解き直すことで定着率がアップします！`)) {
         sessionStorage.setItem('examRevengeMode', 'true');
         sessionStorage.setItem('examRevengeQuestions', JSON.stringify(incorrectQuestionsToRevenge));
-        window.location.href = `exam_player.html?workbookId=${workbookId}`;
+        window.location.href = `exam_player?workbookId=${workbookId}`;
     }
 }
 
@@ -513,8 +513,8 @@ async function saveQuizTags() {
 }
 
 function goToReviewPlayer() { 
-    window.location.href = `exam_review.html?workbookId=${workbookId}${getExtraParams()}`; 
+    window.location.href = `exam_review?workbookId=${workbookId}${getExtraParams()}`; 
 }
 
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-function goToMenu() { window.location.href = `player_menu.html?workbookId=${workbookId}${getExtraParams()}`; }
+function goToMenu() { window.location.href = `player_menu?workbookId=${workbookId}${getExtraParams()}`; }

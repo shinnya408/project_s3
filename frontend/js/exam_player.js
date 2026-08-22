@@ -16,7 +16,7 @@ let questionTags = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    if (!workbookId) { alert('問題集が指定されていません。'); window.location.href = 'index.html'; return; }
+    if (!workbookId) { alert('問題集が指定されていません。'); window.location.href = 'index'; return; }
     
     await loadTagsFromAPI();
 
@@ -178,7 +178,7 @@ async function initFreshExam() {
 
     if (!examQuestions || examQuestions.length === 0) {
         alert('出題する問題が見つかりません。フィルタ設定を見直すか、問題を作成してください。');
-        window.location.href = `exam_filter.html?workbookId=${workbookId}`;
+        window.location.href = `exam_filter?workbookId=${workbookId}`;
         return;
     }
 
@@ -460,8 +460,8 @@ function prevQuestion() { if (currentIndex > 0) showQuestion(currentIndex - 1); 
 function toggleFlag() { userAnswers[currentIndex].flagged = !userAnswers[currentIndex].flagged; showQuestion(currentIndex); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function openQuitModal() { document.getElementById('quit-modal').classList.remove('hidden'); }
-function suspendExam() { saveProgress(); window.location.href = `player_menu.html?workbookId=${workbookId}`; }
-function discardExam() { localStorage.removeItem(SAVE_KEY); window.location.href = `player_menu.html?workbookId=${workbookId}`; }
+function suspendExam() { saveProgress(); window.location.href = `player_menu?workbookId=${workbookId}`; }
+function discardExam() { localStorage.removeItem(SAVE_KEY); window.location.href = `player_menu?workbookId=${workbookId}`; }
 
 function showExamListModal() {
     const container = document.getElementById('list-container');
@@ -496,7 +496,7 @@ function executeFinishExam() {
     
     const resultData = { questions: examQuestions, answers: userAnswers };
     sessionStorage.setItem('examResults', JSON.stringify(resultData));
-    window.location.href = `exam_result.html?workbookId=${workbookId}`;
+    window.location.href = `exam_result?workbookId=${workbookId}`;
 }
 
 function openMemoModal() {

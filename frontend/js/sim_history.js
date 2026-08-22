@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!workbookId) {
         alert('問題集が指定されていません。');
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ★ 修正: 戻るボタンにパラメータを引き継ぐ
     document.getElementById('btn-back').onclick = () => {
-        window.location.href = `sim_menu.html?workbookId=${workbookId}${getExtraParams()}`;
+        window.location.href = `sim_menu?workbookId=${workbookId}${getExtraParams()}`;
     };
 
     await loadHistory();

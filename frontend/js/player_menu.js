@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!workbookId) {
         alert('問題集が指定されていません。');
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const saveKey = `exam_progress_${workbookId}`;
             if (localStorage.getItem(saveKey)) {
                 if (confirm('中断された模試のデータがあります。途中から再開しますか？\n（「キャンセル」を押すとデータは保持したままメニューを見ることができます）')) {
-                    window.location.href = `exam_player.html?workbookId=${workbookId}`;
+                    window.location.href = `exam_player?workbookId=${workbookId}`;
                 }
             }
         }
@@ -109,27 +109,27 @@ function goToMode(targetMode) {
     if (isPreview) extraParams += `&preview=true`;
 
     if (targetMode === 'practice') {
-        window.location.href = `quiz.html?workbookId=${workbookId}&mode=practice${extraParams}`;
+        window.location.href = `quiz?workbookId=${workbookId}&mode=practice${extraParams}`;
     } 
     else if (targetMode === 'exam') {
         const saveKey = `exam_progress_${workbookId}`;
         if (localStorage.getItem(saveKey)) {
             if (confirm('中断された模試のデータがあります。途中から再開しますか？\n（「キャンセル」を押すと過去のデータを破棄して新しく開始します）')) {
-                window.location.href = `exam_player.html?workbookId=${workbookId}`;
+                window.location.href = `exam_player?workbookId=${workbookId}`;
                 return;
             } else {
                 localStorage.removeItem(saveKey);
             }
         }
-        window.location.href = `exam_filter.html?workbookId=${workbookId}`;
+        window.location.href = `exam_filter?workbookId=${workbookId}`;
     }
     else if (targetMode === 'favorite') {
-        window.location.href = `favorite_filter.html?workbookId=${workbookId}${extraParams}`;
+        window.location.href = `favorite_filter?workbookId=${workbookId}${extraParams}`;
     }
     else if (targetMode === 'stats') {
-        window.location.href = `player_stats.html?workbookId=${workbookId}${extraParams}`;
+        window.location.href = `player_stats?workbookId=${workbookId}${extraParams}`;
     }
     else if (targetMode === 'history') {
-        window.location.href = `exam_history.html?workbookId=${workbookId}${extraParams}`;
+        window.location.href = `exam_history?workbookId=${workbookId}${extraParams}`;
     }
 }

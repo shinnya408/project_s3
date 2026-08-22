@@ -130,9 +130,9 @@ async function fetchWorkbooks() {
             startBtn.textContent = '始める';
             startBtn.onclick = () => {
                 if (wb.format === 'SIMULATION') {
-                    window.location.href = `sim_menu.html?workbookId=${wb.id}`;
+                    window.location.href = `sim_menu?workbookId=${wb.id}`;
                 } else {
-                    window.location.href = `player_menu.html?workbookId=${wb.id}`;
+                    window.location.href = `player_menu?workbookId=${wb.id}`;
                 }
             };
 

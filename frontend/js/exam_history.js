@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!workbookId) {
         alert('問題集が指定されていません。');
-        window.location.href = 'index.html';
+        window.location.href = 'index';
         return;
     }
 
@@ -162,7 +162,7 @@ function reviewPastExam(index) {
     sessionStorage.setItem('examResults', JSON.stringify(resultData));
     
     // ★ 修正：遷移時にパラメータを引き継ぐように修正
-    window.location.href = `exam_result.html?workbookId=${workbookId}${getExtraParams()}`;
+    window.location.href = `exam_result?workbookId=${workbookId}${getExtraParams()}`;
 }
 
 function retryPastExam(index) {
@@ -181,7 +181,7 @@ function retryPastExam(index) {
     if (confirm(`当時の出題セット（全 ${record.total} 問）でもう一度模試を開始しますか？\n過去の自分を越えましょう！`)) {
         sessionStorage.setItem('examRevengeMode', 'true');
         sessionStorage.setItem('examRevengeQuestions', JSON.stringify(record.questions));
-        window.location.href = `exam_player.html?workbookId=${workbookId}`;
+        window.location.href = `exam_player?workbookId=${workbookId}`;
     }
 }
 
@@ -214,5 +214,5 @@ async function deleteHistory(targetId, isDbData) {
 }
 
 function goBack() { 
-    window.location.href = `player_menu.html?workbookId=${workbookId}${getExtraParams()}`;
+    window.location.href = `player_menu?workbookId=${workbookId}${getExtraParams()}`;
 }

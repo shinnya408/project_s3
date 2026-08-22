@@ -1423,7 +1423,7 @@ function previewSimQuestion() {
     };
 
     sessionStorage.setItem('simPreviewData', JSON.stringify(previewData));
-    window.open('sim_player.html?workbookId=preview&mode=practice&preview=true&source=local', '_blank');
+    window.open('sim_player?workbookId=preview&mode=practice&preview=true&source=local', '_blank');
 }
 
 init();
