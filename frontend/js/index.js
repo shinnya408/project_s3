@@ -17,7 +17,7 @@ if (!loginUserId) {
             localStorage.removeItem('loginUserName');
             localStorage.removeItem('loginExpiresAt');
             alert('ログインの有効期限が切れました。再度ログインしてください。');
-            window.location.href = 'login.html';
+            window.location.href = 'login';
         } else {
             // 有効期限内ならログイン情報として採用
             loginUserId = localId;
@@ -27,7 +27,7 @@ if (!loginUserId) {
 }
 
 if (!loginUserId) {
-    window.location.href = 'login.html';
+    window.location.href = 'login';
 } else {
     const greetingEl = document.getElementById('user-greeting');
     if (greetingEl) {
@@ -42,7 +42,7 @@ function logout() {
         localStorage.removeItem('loginExpiresAt');
         sessionStorage.removeItem('loginUserId');
         sessionStorage.removeItem('loginUserName');
-        window.location.href = 'login.html';
+        window.location.href = 'login';
     }
 }
 const loginUserRole = localStorage.getItem('loginUserRole') || sessionStorage.getItem('loginUserRole') || 'USER';
