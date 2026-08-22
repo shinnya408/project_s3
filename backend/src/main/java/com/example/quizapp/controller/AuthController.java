@@ -12,7 +12,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
 @RequiredArgsConstructor
 public class AuthController {
 

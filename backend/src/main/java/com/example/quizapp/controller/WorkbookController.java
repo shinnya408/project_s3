@@ -8,7 +8,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/workbooks")
-@CrossOrigin(origins = "*") // CORS対策（開発用にあらゆるオリジンからのアクセスを許可）
+@CrossOrigin(origins = "https://question-app-3rn.pages.dev") // CORS対策
 @RequiredArgsConstructor
 public class WorkbookController {
 

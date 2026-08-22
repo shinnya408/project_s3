@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/changelogs")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
 @RequiredArgsConstructor
 public class ChangelogController {
     private final ChangelogRepository changelogRepository;

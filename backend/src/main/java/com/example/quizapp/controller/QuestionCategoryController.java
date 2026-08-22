@@ -11,7 +11,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/categories")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://question-app-3rn.pages.dev")
 @RequiredArgsConstructor
 public class QuestionCategoryController {
 

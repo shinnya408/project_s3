@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/questions")
-@CrossOrigin(origins = "*") 
+@CrossOrigin(origins = "https://question-app-3rn.pages.dev") 
 @RequiredArgsConstructor
 public class QuestionController {
 
