@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://question-app-3rn.pages.dev';
+const API_BASE_URL = 'https://project-s3.onrender.com';
 
 function initTheme() {
       if (localStorage.getItem('theme') === 'dark') {
