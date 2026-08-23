@@ -67,7 +67,6 @@ async function initFreshExam() {
         examQuestions = JSON.parse(sessionStorage.getItem('examRevengeQuestions'));
     } else {
         try {
-            // ★ 変数名エラーを修正し、すべての fetch に getAuthHeaders() を付与
             const [resMcq, resDd, resHistory, resTags] = await Promise.all([
                 fetch(`${API_BASE_URL}/questions/player?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
                 fetch(`${API_BASE_URL}/dd-questions?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
@@ -249,6 +248,8 @@ function showQuestion(index) {
     document.getElementById('progress-text').innerText = `問 ${index + 1} / ${examQuestions.length}`;
     document.getElementById('q-no-badge').innerText = `第 ${index + 1} 問`;
     document.getElementById('q-id-badge').innerText = `ID: ${q.id}`;
+    
+    // ★ 修正：問題文の改行を反映
     document.getElementById('q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('q-text').innerText = q.question;
     
@@ -311,6 +312,7 @@ function renderMcqForExam(q, ans, playArea) {
         const isChecked = userVals.includes(c.id) ? 'checked' : '';
         const bgStyle = isChecked ? 'background-color: rgba(59, 130, 246, 0.05); border-color: var(--primary);' : 'background-color: var(--bg-card); border-color: var(--border);';
         const safeText = c.text.toString().replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // ★ 修正：選択肢の改行を反映
         html += `
             <label class="mcq-label" style="display: flex; align-items: center; padding: 15px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; ${bgStyle}">
                 <input type="${inputType}" name="mcq-answer" value="${c.id}" ${isChecked} style="margin-right: 15px; transform: scale(1.3); cursor: pointer;">
@@ -375,9 +377,10 @@ function renderDdForExam(q, ans, playArea) {
     let items = q.dragItems || q.draggables || q.items || [];
     items.forEach((item, index) => {
         const text = item.text || item.content || item.name || '';
+        // ★ 修正：D&Dアイテムの改行を反映
+        const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
         let itemHtml = `<div id="drag-item-${index}" class="dd-drag-item" draggable="true" data-original-idx="${index}" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 15px; cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;">`;
         if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
-        const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
         itemHtml += `<span style="white-space: pre-wrap;">${safeText}</span></div>`;
         
         const savedZoneIdx = ans.ddAnswers[index] !== undefined ? ans.ddAnswers[index] : -1;

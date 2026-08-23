@@ -135,8 +135,10 @@ function gradeExam() {
             ? `<span class="result-status" style="color: var(--success);">⭕ 正解</span>`
             : `<span class="result-status" style="color: var(--danger);">❌ 不正解</span>`;
 
+        // ★ 修正：レイアウト崩れを防ぐために問題文の改行をスペースに変換
         const safeQ = q.question.replace(/\n/g, ' ');
-        const snippet = safeQ.length > 25 ? safeQ.substring(0, 25) + '...' : safeQ;
+        const safeSnippet = safeQ.substring(0, 30) + (safeQ.length > 30 ? '...' : '');
+
         item.innerHTML = `
             <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
                 ${statusHtml}
@@ -263,6 +265,8 @@ function openReviewModal(index) {
     
     document.getElementById('review-title').innerText = `第 ${index + 1} 問 の見直し`;
     document.getElementById('review-id').innerText = `ID: ${q.id}`;
+    
+    // ★ 修正：モーダル内の改行を反映
     document.getElementById('review-q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('review-q-text').innerText = q.question;
 
@@ -299,9 +303,10 @@ function openReviewModal(index) {
             const arrayData = q.choices || q.options || q.items || null;
             if (Array.isArray(arrayData) && arrayData.length >= val) {
                 const c = arrayData[val - 1];
+                // ★ 修正：改行をスペースに変換して表示
                 return (typeof c === 'object' ? (c.text || c.content || c.name || '') : c).toString().replace(/\n/g, ' ');
             }
-            return q[`choice${val}`] || q[`option${val}`] || `選択肢 ${val}`;
+            return (q[`choice${val}`] || q[`option${val}`] || `選択肢 ${val}`).toString().replace(/\n/g, ' ');
         };
 
         const correctText = correctVals.map(getChoiceText).join(' ／ ');
@@ -323,6 +328,7 @@ function openReviewModal(index) {
         }
     }
 
+    // ★ 修正：モーダル内の改行を反映
     document.getElementById('review-exp-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('review-exp-text').innerText = q.explanation || "この問題には解説が設定されていません。";
     document.getElementById('review-modal').classList.remove('hidden');
@@ -338,7 +344,6 @@ function openTagModal() {
         return;
     }
 
-    // ★ 修正：一括タグ用のリストを動的生成
     const container = document.querySelector('#tag-modal .checkbox-group');
     if (container) {
         container.innerHTML = '';
@@ -395,7 +400,6 @@ async function applyBatchTags() {
             }
         }
 
-        // ★ 修正：全出題問題にタグを付与
         for (const q of examQuestions) {
             const key = `${q.format}_${q.id}`;
             let currentTags = questionTags[key] || [];

@@ -85,7 +85,11 @@ function showQuestion(index) {
 
     document.getElementById('progress-text').innerText = `問 ${index + 1} / ${examQuestions.length}`;
     document.getElementById('q-id-badge').innerText = `ID: ${q.id}`;
+    
+    // ★ 修正：問題文・解説の改行を反映
+    document.getElementById('q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('q-text').innerText = q.question;
+    document.getElementById('exp-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('exp-text').innerText = q.explanation || "この問題には解説が設定されていません。";
 
     const flagInd = document.getElementById('q-flag-indicator');
@@ -173,6 +177,7 @@ function renderReviewMcq(q, ans, correctVals) {
         }
 
         const safeText = c.text.toString().replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // ★ 修正：選択肢の改行を反映
         html += `
             <label class="mcq-label" style="display: flex; align-items: center; padding: 15px; border: 2px solid; border-radius: 8px; cursor: default; ${bgStyle}">
                 <input type="${inputType}" disabled ${isChecked} style="margin-right: 15px; transform: scale(1.3);">
@@ -233,6 +238,7 @@ function renderReviewDd(q, ans) {
 
         let itemHtml = `<div class="dd-drag-item" style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 6px; padding: 10px 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none; display: flex; flex-direction: column; gap: 5px;">`;
         if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
+        // ★ 修正：D&Dアイテムの改行を反映
         const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
         itemHtml += `<span style="white-space: pre-wrap;">${safeText}</span>`;
         
