@@ -29,7 +29,9 @@ body {
     background-color: var(--bg-main);
     color: var(--text-main);
     transition: background-color 0.3s, color 0.3s;
-    padding-bottom: 80px; /* 下部バーの分の余白 */
+    
+    /* ★ 修正：スマホでボタンが2〜3行に折り返しても選択肢が隠れないように余白を大幅に増やす */
+    padding-bottom: calc(180px + env(safe-area-inset-bottom));
 }
 
 .hidden { display: none !important; }
@@ -210,7 +212,6 @@ summary:hover {
     visibility: hidden;
     min-width: 250px;
     
-    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
     background-color: var(--bg-card, #ffffff);
     color: var(--text-main, #333333);
     border: 1px solid var(--border, #e2e8f0);
@@ -221,29 +222,24 @@ summary:hover {
     position: fixed;
     z-index: 9999;
     
-    /* ① 画面の右下に配置 */
     right: 20px;
     bottom: 20px;
     
-    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
     transform: translateX(120%);
     opacity: 0;
     
-    /* 滑らかなスライドアニメーションの設定 */
     transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
     
     font-size: 0.95em;
     font-weight: bold;
 }
 
-/* 表示された時のクラス（元の位置に戻ってくる） */
 .toast-notification.show {
     visibility: visible;
     opacity: 1;
-    transform: translateX(0); /* 定位置へスライドイン */
+    transform: translateX(0);
 }
 
-/* ダークモード時の影の調整 */
 [data-theme="dark"] .toast-notification {
     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
 }

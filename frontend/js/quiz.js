@@ -90,7 +90,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             if (currentQuestions.length === 0) {
                 alert('選択したタグが付いている問題が見つかりませんでした。\nタグ管理画面に戻ります。');
-                // ★ 修正：遷移時にパラメータを引き継ぐ
                 window.location.href = `favorite_filter?workbookId=${currentWorkbookId}` + getExtraParams();
                 return;
             }
@@ -100,7 +99,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentQuestions = originalQuestions.filter(q => weaknessKeys.includes(`${q.format}_${q.id}`));
             if (currentQuestions.length === 0) {
                 alert('弱点問題が見つかりませんでした。成績画面に戻ります。');
-                // ★ 修正：遷移時にパラメータを引き継ぐ
                 window.location.href = `player_stats?workbookId=${currentWorkbookId}` + getExtraParams();
                 return;
             }
@@ -147,6 +145,8 @@ function showQuestion(index) {
     
     document.getElementById('q-category-badge').innerText = q.categoryMajorId ? `📁 ${getCategoryName(q.categoryMajorId)}` : '未分類';
     
+    // ★ 修正：問題文の改行を反映
+    document.getElementById('q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('q-text').innerText = q.question;
     
     const hist = historyMap[`${q.format}_${q.id}`] || [];
@@ -213,10 +213,11 @@ function renderMcqPlayer(q, playArea) {
     let html = `<div class="mcq-options" style="display: flex; flex-direction: column; gap: 12px;">`;
     choices.forEach(c => {
         const safeText = c.text.toString().replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // ★ 修正：選択肢の改行を反映 (white-space: pre-wrap;)
         html += `
             <label class="mcq-label" style="display: flex; align-items: center; padding: 15px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; background: var(--bg-card);">
                 <input type="${inputType}" name="mcq-answer" value="${c.id}" style="margin-right: 15px; transform: scale(1.3); cursor: pointer;">
-                <span style="font-size: 1.1em; line-height: 1.4;">${safeText}</span>
+                <span style="font-size: 1.1em; line-height: 1.4; white-space: pre-wrap;">${safeText}</span>
             </label>
         `;
     });
@@ -305,7 +306,10 @@ function submitAnswer() {
     
     saveAndSubmitSingleHistory(q.id, q.format, isCorrect);
     
+    // ★ 修正：解説の改行を反映
+    document.getElementById('exp-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('exp-text').innerText = q.explanation || '解説はありません。';
+    
     const expImg = document.getElementById('exp-image');
     if (q.explanationImageUrl) {
         expImg.src = q.explanationImageUrl;
@@ -384,10 +388,12 @@ function showListModal() {
                 if (hist[hist.length - 1]) { mark = '⭕'; borderColor = 'var(--success)'; } 
                 else { mark = '❌'; borderColor = 'var(--danger)'; }
             }
-            const snippet = q.question.length > 25 ? q.question.substring(0, 25) + '...' : q.question;
+            // ★ 修正：改行をスペースに変換
+            const safeQ = q.question.replace(/\n/g, ' ');
+            const snippet = safeQ.length > 25 ? safeQ.substring(0, 25) + '...' : safeQ;
             
             html += `<button class="action-btn" style="width: 100%; text-align: left; padding: 6px 10px; font-size: 0.9em; font-weight: normal; border-left: 4px solid ${borderColor}; background: var(--bg-main);" onclick="jumpToQuestion('${q.format}', ${q.id})">
-                ${mark} ID:${q.id} ${snippet}
+                ${mark} ID:${q.id} ${snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
             </button>`;
         });
         html += '</div>';
@@ -520,9 +526,11 @@ function renderDdPlayer(q, playArea) {
     shuffledItems.forEach((item, index) => {
         const correctZone = (item.correctZoneIndex !== undefined && item.correctZoneIndex !== null) ? item.correctZoneIndex : -1;
         const text = item.text || item.content || item.name || '';
+        // ★ 修正：D&Dアイテムの改行を反映
+        const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
         let itemHtml = `<div id="drag-item-${index}" class="dd-drag-item" draggable="true" data-correct-zone="${correctZone}" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 15px; cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;">`;
         if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
-        itemHtml += `<span>${text}</span></div>`;
+        itemHtml += `<span style="white-space: pre-wrap;">${safeText}</span></div>`;
         sourceArea.insertAdjacentHTML('beforeend', itemHtml);
     });
     setupDragAndDrop();
@@ -678,7 +686,6 @@ async function saveQuizTags() {
     }
 }
 
-// ★ 追加：HTML側にボタンがあれば呼ばれる戻る処理
 function goBack() {
     window.location.href = `player_menu?workbookId=${currentWorkbookId}` + getExtraParams();
 }
@@ -700,7 +707,6 @@ document.addEventListener('keydown', (e) => {
         case 'r': toggleShuffle(); break;
         case 's': openQuizTagModal(); break;
         case 'l': showListModal(); break;
-        // ★ 修正：戻る際にもパラメータを引き継ぐ
         case 'b': goBack(); break;
         case 't': toggleTheme(); break;
     }
