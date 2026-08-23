@@ -132,3 +132,25 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
         font-size: 1em;
     }
 }
+
+/* ==========================================
+   スマホ（画面幅768px以下）用のレスポンシブ対応
+========================================== */
+@media screen and (max-width: 768px) {
+    /* 左右のナビゲーションボタンを非表示にする */
+    .side-nav-btn {
+        display: none !important;
+    }
+
+    /* ボタンが消えた分、メインエリアを画面幅いっぱいに広げる */
+    .main-wrapper {
+        margin: 10px; /* 左右の余白を小さく */
+        gap: 0;       /* 要素間の隙間をなくす */
+    }
+
+    /* コンテンツの箱の角丸や余白を少し小さくして表示領域を最大化 */
+    .question-box, .play-area, .explanation-area {
+        padding: 15px;
+        border-radius: 8px;
+    }
+}
