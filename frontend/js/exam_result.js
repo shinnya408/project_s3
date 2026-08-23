@@ -135,6 +135,8 @@ function gradeExam() {
             ? `<span class="result-status" style="color: var(--success);">⭕ 正解</span>`
             : `<span class="result-status" style="color: var(--danger);">❌ 不正解</span>`;
 
+        const safeQ = q.question.replace(/\n/g, ' ');
+        const snippet = safeQ.length > 25 ? safeQ.substring(0, 25) + '...' : safeQ;
         item.innerHTML = `
             <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
                 ${statusHtml}
@@ -143,7 +145,7 @@ function gradeExam() {
                         <span style="color: var(--text-sub);">第 ${index + 1} 問 (ID: ${q.id} ${q.format === 'dd' ? 'D&D' : ''})</span>
                         <span style="margin-left: 10px; ${timeStyle}">⏱️ ${timeText}</span>
                     </div>
-                    <div style="font-weight: bold;">${q.question.substring(0, 30)}${q.question.length > 30 ? '...' : ''}</div>
+                    <div style="font-weight: bold;">${safeSnippet.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                 </div>
                 <div style="display: flex; gap: 5px;">
                     <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.85em;" onclick="openTagModalForIndex(${index})">⭐</button>
@@ -261,6 +263,7 @@ function openReviewModal(index) {
     
     document.getElementById('review-title').innerText = `第 ${index + 1} 問 の見直し`;
     document.getElementById('review-id').innerText = `ID: ${q.id}`;
+    document.getElementById('review-q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('review-q-text').innerText = q.question;
 
     if (q.format === 'dd') {
@@ -296,7 +299,7 @@ function openReviewModal(index) {
             const arrayData = q.choices || q.options || q.items || null;
             if (Array.isArray(arrayData) && arrayData.length >= val) {
                 const c = arrayData[val - 1];
-                return typeof c === 'object' ? (c.text || c.content || c.name || '') : c;
+                return (typeof c === 'object' ? (c.text || c.content || c.name || '') : c).toString().replace(/\n/g, ' ');
             }
             return q[`choice${val}`] || q[`option${val}`] || `選択肢 ${val}`;
         };
@@ -320,6 +323,7 @@ function openReviewModal(index) {
         }
     }
 
+    document.getElementById('review-exp-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('review-exp-text').innerText = q.explanation || "この問題には解説が設定されていません。";
     document.getElementById('review-modal').classList.remove('hidden');
 }

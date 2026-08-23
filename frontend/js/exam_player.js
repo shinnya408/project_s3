@@ -249,6 +249,7 @@ function showQuestion(index) {
     document.getElementById('progress-text').innerText = `問 ${index + 1} / ${examQuestions.length}`;
     document.getElementById('q-no-badge').innerText = `第 ${index + 1} 問`;
     document.getElementById('q-id-badge').innerText = `ID: ${q.id}`;
+    document.getElementById('q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('q-text').innerText = q.question;
     
     const imgEl = document.getElementById('q-image');
@@ -313,7 +314,7 @@ function renderMcqForExam(q, ans, playArea) {
         html += `
             <label class="mcq-label" style="display: flex; align-items: center; padding: 15px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; ${bgStyle}">
                 <input type="${inputType}" name="mcq-answer" value="${c.id}" ${isChecked} style="margin-right: 15px; transform: scale(1.3); cursor: pointer;">
-                <span style="font-size: 1.1em; line-height: 1.4;">${safeText}</span>
+                <span style="font-size: 1.1em; line-height: 1.4; white-space: pre-wrap;">${safeText}</span>
             </label>
         `;
     });
@@ -376,7 +377,8 @@ function renderDdForExam(q, ans, playArea) {
         const text = item.text || item.content || item.name || '';
         let itemHtml = `<div id="drag-item-${index}" class="dd-drag-item" draggable="true" data-original-idx="${index}" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 15px; cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;">`;
         if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
-        itemHtml += `<span>${text}</span></div>`;
+        const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        itemHtml += `<span style="white-space: pre-wrap;">${safeText}</span></div>`;
         
         const savedZoneIdx = ans.ddAnswers[index] !== undefined ? ans.ddAnswers[index] : -1;
         let targetZone = sourceArea;

@@ -176,7 +176,7 @@ function renderReviewMcq(q, ans, correctVals) {
         html += `
             <label class="mcq-label" style="display: flex; align-items: center; padding: 15px; border: 2px solid; border-radius: 8px; cursor: default; ${bgStyle}">
                 <input type="${inputType}" disabled ${isChecked} style="margin-right: 15px; transform: scale(1.3);">
-                <span style="font-size: 1.1em; line-height: 1.4;">${safeText}</span>
+                <span style="font-size: 1.1em; line-height: 1.4; white-space: pre-wrap;">${safeText}</span>
             </label>
         `;
     });
@@ -233,7 +233,8 @@ function renderReviewDd(q, ans) {
 
         let itemHtml = `<div class="dd-drag-item" style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 6px; padding: 10px 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none; display: flex; flex-direction: column; gap: 5px;">`;
         if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
-        itemHtml += `<span>${text}</span>`;
+        const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        itemHtml += `<span style="white-space: pre-wrap;">${safeText}</span>`;
         
         if (cZone !== uZone) {
             let correctZoneName = "元の場所 (未分類)";
