@@ -520,7 +520,7 @@ function addOptionUIToContainer(text = '', isCorrect = false, imageUrl = '') {
     div.innerHTML = `
         <div style="display:flex; align-items:center; gap:10px; width:100%;">
             <span style="font-weight:bold; color:var(--format-text);">選択肢${index}</span>
-            <input type="text" class="opt-text" value="${text}" placeholder="選択肢の文章">
+            <textarea class="opt-text" placeholder="選択肢の文章" rows="2" style="flex:1; resize:vertical;">${text}</textarea>
             <label class="is-correct-label"><input type="checkbox" class="opt-correct" ${isCorrect ? 'checked' : ''}> 正解</label>
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">削除</button>
         </div>
@@ -654,7 +654,7 @@ function addOptionToManualBlock(containerId) {
     div.innerHTML = `
         <div style="display:flex; align-items:center; gap:10px; width:100%;">
             <span style="font-weight:bold; color:var(--format-text);">選択肢${index}</span>
-            <input type="text" class="opt-text" placeholder="選択肢の文章">
+            <textarea class="opt-text" placeholder="選択肢の文章" rows="2" style="flex:1; resize:vertical;"></textarea>
             <label class="is-correct-label"><input type="checkbox" class="opt-correct"> 正解</label>
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">削除</button>
         </div>
@@ -710,23 +710,76 @@ function saveManualBulk() {
 // ==========================================
 // コピペ一括登録・カテゴリ一括設定
 // ==========================================
+
+// ★追加: セル内の改行とダブルクォートを正しく処理するTSVパーサー関数
+function parseTSV(text) {
+    const rows = [];
+    let currentRow = [];
+    let currentCell = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+
+        if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+                // エスケープされたダブルクォート（""）の処理
+                currentCell += '"';
+                i++; // 次の文字をスキップ
+            } else {
+                // クォーテーションの開始・終了
+                inQuotes = !inQuotes;
+            }
+        } else if (char === '\t' && !inQuotes) {
+            // 列の区切り（タブ）
+            currentRow.push(currentCell);
+            currentCell = '';
+        } else if (char === '\n' && !inQuotes) {
+            // 行の区切り（改行）
+            currentRow.push(currentCell);
+            rows.push(currentRow);
+            currentRow = [];
+            currentCell = '';
+        } else if (char === '\r' && !inQuotes) {
+            // Windowsの改行コード(\r\n)の\rを無視
+        } else {
+            // 通常の文字
+            currentCell += char;
+        }
+    }
+    
+    // 最後のセルと行を追加
+    currentRow.push(currentCell);
+    // 空行は除外して追加
+    if (currentRow.some(cell => cell.trim() !== '')) {
+        rows.push(currentRow);
+    }
+    
+    return rows;
+}
+
+// ★変更: 入力時のプレビュー件数カウント処理
 document.getElementById('tsv-input')?.addEventListener('input', function() {
     const text = this.value.trim();
     if (!text) { document.getElementById('bulk-preview').textContent = ''; return; }
-    document.getElementById('bulk-preview').textContent = `現在 ${text.split('\n').length} 件の問題が認識されています。`;
+    
+    const parsedRows = parseTSV(text);
+    document.getElementById('bulk-preview').textContent = `現在 ${parsedRows.length} 件の問題が認識されています。`;
 });
 
+// ★変更: 一括登録の保存処理
 function savePasteBulk() {
     if (!currentWorkbookId) return alert("問題集を選択してください。");
     const text = document.getElementById('tsv-input').value.trim();
     if (!text) return alert("データが入力されていません。");
 
-    const lines = text.split('\n');
+    const parsedRows = parseTSV(text);
     const requestData = [];
 
-    for (let i = 0; i < lines.length; i++) {
-        const columns = lines[i].split('\t');
-        if (columns.length < 5) return alert(`${i + 1}行目のデータが不足しています。\nエラー行: ${lines[i]}`);
+    for (let i = 0; i < parsedRows.length; i++) {
+        const columns = parsedRows[i];
+        if (columns.length < 5) return alert(`${i + 1}行目のデータが不足しています。\nエラー行の開始: ${columns[0]}`);
 
         const questionText = columns[0].trim();
         const imageUrl = columns[1].trim();
@@ -944,7 +997,7 @@ function addDragItemUI(btnElement, itemData = null) {
     itemDiv.innerHTML = `
         <div style="display: flex; gap: 10px;">
             <span style="color: #64748b; padding-top: 5px;">⇒</span>
-            <input type="text" class="drag-item-text" placeholder="テキスト (例: OSPF)" value="${safeItemText}" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            <textarea class="drag-item-text" placeholder="テキスト (例: OSPF)" rows="2" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; resize:vertical;">${safeItemText}</textarea>
             <button class="btn btn-outline" onclick="this.parentElement.parentElement.remove()" style="padding: 2px 8px; color: #ef4444; border-color: #ef4444;">×</button>
         </div>
         <div style="display: flex; gap: 10px; padding-left: 25px;">
@@ -981,7 +1034,7 @@ function addDummyItemUI(dummyData = null) {
     itemDiv.innerHTML = `
         <div style="display: flex; gap: 10px;">
             <span style="color: #64748b; padding-top: 5px;">👻</span>
-            <input type="text" class="dummy-item-text" placeholder="テキスト (例: Macアドレス)" value="${safeItemText}" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            <textarea class="dummy-item-text" placeholder="テキスト (例: Macアドレス)" rows="2" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; resize:vertical;">${safeItemText}</textarea>
             <button class="btn btn-outline" onclick="this.parentElement.parentElement.remove()" style="padding: 2px 8px; color: #ef4444; border-color: #ef4444;">×</button>
         </div>
         <div style="display: flex; gap: 10px; padding-left: 25px;">
