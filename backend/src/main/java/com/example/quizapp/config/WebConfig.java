@@ -19,6 +19,6 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 .allowedOrigins("*") // あなたのCloudflare URL (末尾の/は無し)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*");
+                .allowedOrigins("https://question-app-3rn.pages.dev");
     }
 }

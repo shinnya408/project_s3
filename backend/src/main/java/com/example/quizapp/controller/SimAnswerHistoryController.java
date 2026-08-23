@@ -12,7 +12,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sim-answer-history")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class SimAnswerHistoryController {
 
     private final SimAnswerHistoryRepository simAnswerHistoryRepository;

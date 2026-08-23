@@ -8,7 +8,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/workbooks")
-@CrossOrigin(origins = "*") // CORS対策
 @RequiredArgsConstructor
 public class WorkbookController {
 

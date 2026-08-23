@@ -18,7 +18,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sim-questions")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class SimQuestionController {
 
     private final SimQuestionRepository simQuestionRepository;

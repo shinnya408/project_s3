@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/history")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class ExamHistoryController {
 

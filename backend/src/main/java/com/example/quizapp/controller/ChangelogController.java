@@ -9,7 +9,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/changelogs")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class ChangelogController {
     private final ChangelogRepository changelogRepository;
