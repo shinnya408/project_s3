@@ -39,12 +39,20 @@ body { font-family: sans-serif; background-color: var(--bg-main); color: var(--t
 /* アクションバー */
 .action-bar { display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
 
-/* 結果リスト */
+/* ★ 修正：結果リストのスマートなレイアウト定義 */
 .section-title { font-size: 1.3em; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
-.result-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.result-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 15px; margin-bottom: 10px; }
 .result-item.correct { border-left: 5px solid var(--success); }
 .result-item.incorrect { border-left: 5px solid var(--danger); }
-.result-status { font-weight: bold; width: 80px; }
+
+.result-item-inner { display: flex; align-items: center; gap: 15px; width: 100%; }
+.result-item-header { display: flex; align-items: center; gap: 15px; flex-shrink: 0; min-width: 200px; }
+.result-status { font-weight: bold; width: 80px; flex-shrink: 0; }
+.result-item-meta { font-size: 0.85em; color: var(--text-sub); }
+.result-item-time { font-size: 0.85em; }
+.result-item-snippet { flex: 1; font-weight: bold; font-size: 0.95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.btn-sm { padding: 6px 12px; font-size: 0.85em; }
 
 /* モーダル */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 200; }
@@ -61,89 +69,44 @@ body { font-family: sans-serif; background-color: var(--bg-main); color: var(--t
 .theme-toggle-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-main); }
 .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
 
-/* 🍞 トースト通知のスタイル (右下スライドイン版) */
+/* トースト通知 */
 .toast-notification {
     visibility: hidden;
     min-width: 250px;
-    
-    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
     background-color: var(--bg-card, #ffffff);
     color: var(--text-main, #333333);
     border: 1px solid var(--border, #e2e8f0);
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    
     padding: 15px 20px;
     position: fixed;
     z-index: 9999;
-    
-    /* ① 画面の右下に配置 */
     right: 20px;
     bottom: 20px;
-    
-    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
     transform: translateX(120%);
     opacity: 0;
-    
-    /* 滑らかなスライドアニメーションの設定 */
     transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
-    
     font-size: 0.95em;
     font-weight: bold;
 }
-
-/* 表示された時のクラス（元の位置に戻ってくる） */
-.toast-notification.show {
-    visibility: visible;
-    opacity: 1;
-    transform: translateX(0); /* 定位置へスライドイン */
-}
-
-/* ダークモード時の影の調整 */
-[data-theme="dark"] .toast-notification {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-}
+.toast-notification.show { visibility: visible; opacity: 1; transform: translateX(0); }
+[data-theme="dark"] .toast-notification { box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
 
 /* ==========================================
    スマホ用レスポンシブ対応 (画面幅 768px 以下)
    ========================================== */
 @media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
-    }
-    
-    .page-title {
-        font-size: 1.5em;
-    }
+    .header { flex-direction: column; align-items: flex-start; gap: 15px; }
+    .page-title { font-size: 1.5em; }
+    .score-card { flex-direction: column; text-align: center; gap: 15px; padding: 20px; }
+    .action-bar { flex-direction: column; gap: 10px; }
+    .action-bar .btn { width: 100%; }
 
-    /* スコアカードを縦積みに変更 */
-    .score-card {
-        flex-direction: column;
-        text-align: center;
-        gap: 15px;
-        padding: 20px;
-    }
-
-    /* アクションボタンを縦並びのフル幅に変更 */
-    .action-bar {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .action-bar .btn {
-        width: 100%;
-    }
-
-    /* 問題ごとの結果リストの文字サイズを調整 */
-    .result-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-    
-    .result-status {
-        width: auto;
-    }
+    /* ★ 修正：結果リストのスマホ用コンパクト化 */
+    .result-item { padding: 12px; }
+    .result-item-inner { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .result-item-header { width: 100%; gap: 10px; justify-content: flex-start; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+    .result-status { width: auto; }
+    .result-item-snippet { width: 100%; white-space: normal; line-height: 1.4; padding-bottom: 4px; }
+    .result-item-actions { width: 100%; justify-content: flex-end; }
 }

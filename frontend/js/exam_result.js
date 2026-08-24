@@ -22,7 +22,7 @@ let isHistoryReview = false;
 
 let userTags = [];
 let questionTags = {};
-let currentIndex = 0; // タグ編集用
+let currentIndex = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (titleEl) titleEl.innerText = `📋 ${targetUserName} さんの採点結果`;
     }
 
-    // タグ情報の読み込み（モーダル用）
     await loadTagsFromAPI();
 
     const historyBtn = document.querySelector('button[onclick*="exam_history"]');
@@ -135,23 +134,23 @@ function gradeExam() {
             ? `<span class="result-status" style="color: var(--success);">⭕ 正解</span>`
             : `<span class="result-status" style="color: var(--danger);">❌ 不正解</span>`;
 
-        // ★ 修正：レイアウト崩れを防ぐために問題文の改行をスペースに変換
         const safeQ = q.question.replace(/\n/g, ' ');
         const safeSnippet = safeQ.substring(0, 30) + (safeQ.length > 30 ? '...' : '');
 
+        // ★ 修正：CSSのクラスに合わせたスマートな構造に変更
         item.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
-                ${statusHtml}
-                <div style="flex: 1;">
-                    <div style="font-size: 0.9em; margin-bottom: 5px;">
-                        <span style="color: var(--text-sub);">第 ${index + 1} 問 (ID: ${q.id} ${q.format === 'dd' ? 'D&D' : ''})</span>
-                        <span style="margin-left: 10px; ${timeStyle}">⏱️ ${timeText}</span>
+            <div class="result-item-inner">
+                <div class="result-item-header">
+                    ${statusHtml}
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span class="result-item-meta">第 ${index + 1} 問 (ID: ${q.id} ${q.format === 'dd' ? 'D&D' : ''})</span>
+                        <span class="result-item-time" style="${timeStyle}">⏱️ ${timeText}</span>
                     </div>
-                    <div style="font-weight: bold;">${safeSnippet.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                 </div>
-                <div style="display: flex; gap: 5px;">
-                    <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.85em;" onclick="openTagModalForIndex(${index})">⭐</button>
-                    <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.85em;" onclick="openReviewModal(${index})">🔍 見直し</button>
+                <div class="result-item-snippet">${safeSnippet.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                <div class="result-item-actions">
+                    <button class="btn btn-outline btn-sm" onclick="openTagModalForIndex(${index})">⭐</button>
+                    <button class="btn btn-outline btn-sm" onclick="openReviewModal(${index})">🔍 見直し</button>
                 </div>
             </div>
         `;
@@ -266,7 +265,6 @@ function openReviewModal(index) {
     document.getElementById('review-title').innerText = `第 ${index + 1} 問 の見直し`;
     document.getElementById('review-id').innerText = `ID: ${q.id}`;
     
-    // ★ 修正：モーダル内の改行を反映
     document.getElementById('review-q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('review-q-text').innerText = q.question;
 
@@ -303,7 +301,6 @@ function openReviewModal(index) {
             const arrayData = q.choices || q.options || q.items || null;
             if (Array.isArray(arrayData) && arrayData.length >= val) {
                 const c = arrayData[val - 1];
-                // ★ 修正：改行をスペースに変換して表示
                 return (typeof c === 'object' ? (c.text || c.content || c.name || '') : c).toString().replace(/\n/g, ' ');
             }
             return (q[`choice${val}`] || q[`option${val}`] || `選択肢 ${val}`).toString().replace(/\n/g, ' ');
@@ -328,15 +325,10 @@ function openReviewModal(index) {
         }
     }
 
-    // ★ 修正：モーダル内の改行を反映
     document.getElementById('review-exp-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('review-exp-text').innerText = q.explanation || "この問題には解説が設定されていません。";
     document.getElementById('review-modal').classList.remove('hidden');
 }
-
-// ==========================================
-// タグ操作関連（モーダル）
-// ==========================================
 
 function openTagModal() { 
     if (isReadOnlyMode) {
@@ -404,7 +396,6 @@ async function applyBatchTags() {
             const key = `${q.format}_${q.id}`;
             let currentTags = questionTags[key] || [];
             
-            // 重複を排除してマージ
             const mergedTags = Array.from(new Set([...currentTags, ...checkedTagIds]));
             questionTags[key] = mergedTags;
 

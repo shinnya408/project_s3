@@ -4,7 +4,6 @@
 const urlParams = new URLSearchParams(window.location.search);
 const workbookId = urlParams.get('workbookId');
 
-// ★ URLからターゲットIDやプレビューフラグを取得
 const targetUserId = urlParams.get('targetUserId');
 const targetUserName = urlParams.get('targetUserName');
 const isPreviewMode = urlParams.get('preview') === 'true' || urlParams.get('mode') === 'preview';
@@ -12,7 +11,6 @@ const isPreviewMode = urlParams.get('preview') === 'true' || urlParams.get('mode
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
 
-    // ★ プレビューモード・他人のデータ閲覧中は模試フィルタ画面に入れないようにブロック
     if (isPreviewMode || targetUserId) {
         alert('プレビューモード、または他ユーザーの成績確認中は「模試モード」を利用できません。');
         window.location.href = `player_menu?workbookId=${workbookId}`;
@@ -26,19 +24,35 @@ async function loadFilterData() {
     if (!workbookId) return;
 
     try {
-        // ★ すべての fetch に { headers: getAuthHeaders() } を付与
-        const [tagsRes, catRes, mcqRes, ddRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/tags?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/categories?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/questions/player?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/dd-questions?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false}))
-        ]);
+        // ★ 変更: 4つのAPI通信を、新しい player-data API 1つに統合
+        let apiUrl = `${API_BASE_URL}/player-data?workbookId=${workbookId}`;
+        if (targetUserId) apiUrl += `&targetUserId=${targetUserId}`;
+
+        const res = await fetch(apiUrl, { headers: getAuthHeaders() });
+        
+        const tagContainer = document.getElementById('tag-container');
+        const catContainer = document.getElementById('category-container');
+
+        if (!res.ok) {
+            if (tagContainer) tagContainer.innerHTML = '<p style="color: var(--danger); font-size: 0.9em;">通信エラー</p>';
+            if (catContainer) catContainer.innerHTML = '<p style="color: var(--danger); font-size: 0.9em;">通信エラー</p>';
+            return;
+        }
+
+        const data = await res.json();
+        
+        // データの振り分け
+        const tags = data.tags?.tags || [];
+        const categories = data.categories || [];
+        const mcqData = data.mcq || [];
+        const ddData = data.dd || [];
+        
+        const mappedMcq = mcqData.map(q => ({ ...q, format: 'mcq' }));
+        const mappedDd = ddData.map(q => ({ ...q, format: 'dd' }));
+        const allQuestions = [...mappedMcq, ...mappedDd];
         
         // --- タグの描画 ---
-        const tagContainer = document.getElementById('tag-container');
-        if (tagsRes.ok) {
-            const tagData = await tagsRes.json();
-            const tags = tagData.tags || [];
+        if (tagContainer) {
             tagContainer.innerHTML = '';
             if (tags.length === 0) {
                 tagContainer.innerHTML = '<p style="color: var(--text-sub); font-size: 0.9em;">作成されたタグはありません。</p>';
@@ -49,18 +63,10 @@ async function loadFilterData() {
                     `);
                 });
             }
-        } else {
-            tagContainer.innerHTML = '<p style="color: var(--danger); font-size: 0.9em;">通信エラー</p>';
         }
 
         // --- カテゴリの描画（大・中・小の階層アコーディオン化） ---
-        const catContainer = document.getElementById('category-container');
-        if (catRes.ok) {
-            const categories = await catRes.json();
-            const mcqData = mcqRes.ok ? await mcqRes.json() : [];
-            const ddData = ddRes.ok ? await ddRes.json() : [];
-            const allQuestions = [...mcqData, ...ddData];
-
+        if (catContainer) {
             catContainer.innerHTML = '';
             
             if (categories.length === 0 && allQuestions.length === 0) {
@@ -72,7 +78,6 @@ async function loadFilterData() {
             categories.forEach(c => catNameMap[c.id] = c.name);
             const getCatName = (id) => catNameMap[id] || `不明なカテゴリ (ID:${id})`;
 
-            // 問題データからツリー構造を生成 (問題が登録されているカテゴリだけが抽出される)
             const tree = {};
             allQuestions.forEach(q => {
                 const majorId = q.categoryMajorId || 'unclassified';
@@ -94,13 +99,13 @@ async function loadFilterData() {
                 }
             });
 
-            // 直下にある問題のIDリストを生成する関数
             function buildQuestionHints(itemsArray) {
                 if (!itemsArray || itemsArray.length === 0) return '';
                 let html = '<div style="margin-left: 25px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; border-left: 2px solid var(--primary); padding-left: 10px;">';
                 itemsArray.forEach(q => {
-                    const snippet = q.question.length > 25 ? q.question.substring(0, 25) + '...' : q.question;
-                    html += `<span style="font-size: 0.85em; color: var(--text-sub);">📄 ID:${q.id} ${snippet}</span>`;
+                    const safeQ = q.question.replace(/\n/g, ' ');
+                    const snippet = safeQ.length > 25 ? safeQ.substring(0, 25) + '...' : safeQ;
+                    html += `<span style="font-size: 0.85em; color: var(--text-sub);">📄 ID:${q.id} ${snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
                 });
                 html += '</div>';
                 return html;
@@ -108,7 +113,6 @@ async function loadFilterData() {
 
             let catHtml = '';
 
-            // 大項目の展開
             for (const majorId in tree) {
                 const majorName = majorId === 'unclassified' ? '未分類 (カテゴリなし)' : getCatName(parseInt(majorId));
                 const majorVal = majorId === 'unclassified' ? 'unclassified' : `major_${majorId}`;
@@ -124,7 +128,6 @@ async function loadFilterData() {
                         ${buildQuestionHints(majorNode.items)}
                 `;
 
-                // 中項目の展開
                 for (const mediumId in majorNode.subs) {
                     const mediumName = getCatName(parseInt(mediumId));
                     const mediumNode = majorNode.subs[mediumId];
@@ -139,7 +142,6 @@ async function loadFilterData() {
                             ${buildQuestionHints(mediumNode.items)}
                     `;
 
-                    // 小項目の展開
                     for (const minorId in mediumNode.subs) {
                         const minorName = getCatName(parseInt(minorId));
                         const minorNode = mediumNode.subs[minorId];
@@ -162,9 +164,6 @@ async function loadFilterData() {
             }
             
             catContainer.insertAdjacentHTML('beforeend', catHtml);
-
-        } else {
-            catContainer.innerHTML = '<p style="color: var(--danger); font-size: 0.9em;">通信エラー</p>';
         }
     } catch (e) {
         console.error(e);

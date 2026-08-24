@@ -28,42 +28,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!currentWorkbookId) { alert('問題集が指定されていません。'); return; }
 
     try {
-        let historyUrl = `${API_BASE_URL}/answer-history/summary?workbookId=${currentWorkbookId}`;
-        if (targetUserId) historyUrl += `&targetUserId=${targetUserId}`;
+        // ★ 新APIへの1回の通信に統合
+        let apiUrl = `${API_BASE_URL}/player-data?workbookId=${currentWorkbookId}`;
+        if (targetUserId) apiUrl += `&targetUserId=${targetUserId}`;
 
-        let tagsUrl = `${API_BASE_URL}/tags?workbookId=${currentWorkbookId}`;
-        if (targetUserId) tagsUrl += `&targetUserId=${targetUserId}`;
+        const res = await fetch(apiUrl, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('データ取得エラー');
+        const data = await res.json();
 
-        const [resMcq, resDd, resHistory, resTags, resCat] = await Promise.all([
-            fetch(`${API_BASE_URL}/questions/player?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/dd-questions?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(historyUrl, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(tagsUrl, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/categories?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false}))
-        ]);
+        // ★ 取得したデータを各変数に振り分ける
+        const mcqData = data.mcq || [];
+        const ddData = data.dd || [];
         
-        const mcqData = resMcq.ok ? await resMcq.json() : [];
-        const ddData = resDd.ok ? await resDd.json() : [];
-        
-        if (resHistory.ok) {
-            const histories = await resHistory.json();
-            histories.forEach(h => { historyMap[h.questionFormat + '_' + h.questionId] = JSON.parse(h.historyJson); });
-        }
+        data.history.forEach(h => { historyMap[h.questionFormat + '_' + h.questionId] = JSON.parse(h.historyJson); });
 
-        if (resTags.ok) {
-            const tagData = await resTags.json();
-            userTags = tagData.tags || [];
-            questionTags = tagData.questionTags || {};
+        userTags = data.tags.tags || [];
+        questionTags = data.tags.questionTags || {};
+        if (!isReadOnlyMode) {
             localStorage.setItem(`user_tags_${currentWorkbookId}`, JSON.stringify(userTags));
             localStorage.setItem(`question_tags_${currentWorkbookId}`, JSON.stringify(questionTags));
-        } else {
-            userTags = JSON.parse(localStorage.getItem(`user_tags_${currentWorkbookId}`)) || [];
-            questionTags = JSON.parse(localStorage.getItem(`question_tags_${currentWorkbookId}`)) || {};
         }
 
-        if (resCat.ok) {
-            categoryMaster = await resCat.json();
-        }
+        categoryMaster = data.categories || [];
 
         const mappedMcq = mcqData.map(q => ({ ...q, format: 'mcq' }));
         const mappedDd = ddData.map(q => ({ ...q, format: 'dd' }));

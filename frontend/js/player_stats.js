@@ -33,39 +33,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadRealStats() {
     try {
-        let historyUrl = `${API_BASE_URL}/answer-history/summary?workbookId=${workbookId}`;
-        if (targetUserId) historyUrl += `&targetUserId=${targetUserId}`;
+        // ★ 新APIへの1回の通信に統合
+        let apiUrl = `${API_BASE_URL}/player-data?workbookId=${workbookId}`;
+        if (targetUserId) apiUrl += `&targetUserId=${targetUserId}`;
 
-        let tagsUrl = `${API_BASE_URL}/tags?workbookId=${workbookId}`;
-        if (targetUserId) tagsUrl += `&targetUserId=${targetUserId}`;
+        const res = await fetch(apiUrl, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('データ取得エラー');
+        const data = await res.json();
 
-        const [historyRes, mcqRes, ddRes, categoriesRes, tagsRes] = await Promise.all([
-            fetch(historyUrl, { headers: getAuthHeaders() }),
-            fetch(`${API_BASE_URL}/questions/player?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/dd-questions?workbookId=${workbookId}`, { headers: getAuthHeaders() }).catch(()=>({ok:false})),
-            fetch(`${API_BASE_URL}/categories?workbookId=${workbookId}`, { headers: getAuthHeaders() }),
-            fetch(tagsUrl, { headers: getAuthHeaders() }).catch(()=>({ok:false}))
-        ]);
+        // ★ 取得したデータを変数にセット
+        const histories = data.history || [];
+        const categories = data.categories || [];
 
-        if (!historyRes.ok || !categoriesRes.ok) throw new Error('データ取得エラー');
-
-        const histories = await historyRes.json();
-        const categories = await categoriesRes.json();
-
-        const mcqData = mcqRes.ok ? await mcqRes.json() : [];
-        const ddData = ddRes.ok ? await ddRes.json() : [];
+        const mcqData = data.mcq || [];
+        const ddData = data.dd || [];
         const mappedMcq = mcqData.map(q => ({ ...q, format: 'mcq' }));
         const mappedDd = ddData.map(q => ({ ...q, format: 'dd' }));
         const questions = [...mappedMcq, ...mappedDd]; 
 
-        if (tagsRes.ok) {
-            const tagData = await tagsRes.json();
-            userTagsCache = tagData.tags || [];
-            questionTagsCache = tagData.questionTags || {};
-        } else {
-            userTagsCache = JSON.parse(localStorage.getItem(`user_tags_${workbookId}`)) || [];
-            questionTagsCache = JSON.parse(localStorage.getItem(`question_tags_${workbookId}`)) || {};
-        }
+        userTagsCache = data.tags.tags || [];
+        questionTagsCache = data.tags.questionTags || {};
+
+        allQuestionsCache = questions; 
+        categoryListCache = categories;
 
         allQuestionsCache = questions; 
         categoryListCache = categories;

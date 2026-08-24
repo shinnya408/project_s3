@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <!-- ★ 追加：スマホの画面幅に合わせて表示サイズを最適化する設定 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>模試設定 (1/2) - 出題フィルタ</title>
     <link rel="stylesheet" href="css/exam_config.css">
     <link rel="manifest" href="manifest.json">
@@ -47,7 +49,7 @@
             </div>
         </div>
 
-        <!-- ★ 修正：動的にタグを生成するコンテナ -->
+        <!-- 動的にタグを生成するコンテナ -->
         <div class="form-group">
             <label class="form-label">お気に入りタグ (複数選択可・空で全て対象)</label>
             <div class="checkbox-group" id="tag-container">
@@ -55,7 +57,7 @@
             </div>
         </div>
 
-        <!-- ★ 修正：動的にカテゴリを生成するコンテナ -->
+        <!-- 動的にカテゴリを生成するコンテナ -->
         <div class="form-group">
             <label class="form-label">対象カテゴリ (複数選択可・空で全て対象)</label>
             <div class="checkbox-group" id="category-container">
