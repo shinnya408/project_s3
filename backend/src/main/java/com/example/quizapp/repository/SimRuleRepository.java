@@ -10,4 +10,5 @@ import java.util.List;
 public interface SimRuleRepository extends JpaRepository<SimRule, Long> {
     List<SimRule> findBySimTaskIdOrderByIdAsc(Long simTaskId);
     void deleteBySimTaskId(Long simTaskId);
+    List<SimRule> findBySimTaskIdInOrderByIdAsc(List<Long> simTaskIds);
 }

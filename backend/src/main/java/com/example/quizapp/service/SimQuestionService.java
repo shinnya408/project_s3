@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,10 +24,63 @@ public class SimQuestionService {
     private final SimTaskRepository simTaskRepository;
     private final SimRuleRepository simRuleRepository;
 
-    // 問題取得
+    // ★ 修正: N+1問題を解消した爆速な問題取得メソッド
     public List<SimQuestionDto> getQuestionsByWorkbookId(Long workbookId) {
+        // 1. 指定した問題集のシミュレーション問題を一括取得 (1回目の通信)
         List<SimQuestion> questions = simQuestionRepository.findByWorkbookIdAndDeletedFalseOrderByIdAsc(workbookId);
         
+        if (questions.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 取得した問題のIDリストを作成
+        List<Long> questionIds = questions.stream().map(SimQuestion::getId).collect(Collectors.toList());
+
+        // 2. その問題に関連する全タスクを一括取得 (2回目の通信)
+        List<SimTask> allTasks = simTaskRepository.findBySimQuestionIdInOrderBySequenceAsc(questionIds);
+        
+        // 取得したタスクのIDリストを作成
+        List<Long> taskIds = allTasks.stream().map(SimTask::getId).collect(Collectors.toList());
+        
+        // 3. そのタスクに関連する全ルールを一括取得 (3回目の通信)
+        List<SimRule> allRules = new ArrayList<>();
+        if (!taskIds.isEmpty()) {
+            allRules = simRuleRepository.findBySimTaskIdInOrderByIdAsc(taskIds);
+        }
+
+        // --- ここからはJava上のメモリ処理なので一瞬で終わります ---
+
+        // ルールを taskId ごとにグループ化
+        Map<Long, List<SimRule>> rulesByTaskId = allRules.stream()
+                .collect(Collectors.groupingBy(SimRule::getSimTaskId));
+
+        // タスクを questionId ごとにグループ化（DTOに変換しながら）
+        Map<Long, List<SimQuestionDto.SimTaskDto>> taskDtosByQuestionId = allTasks.stream().map(t -> {
+            SimQuestionDto.SimTaskDto tDto = new SimQuestionDto.SimTaskDto();
+            tDto.setId(t.getId());
+            tDto.setSequence(t.getSequence());
+            tDto.setInstruction(t.getInstruction());
+            tDto.setExplanation(t.getExplanation());
+            // グループ化しておいたルールをセット
+            List<SimRule> rules = rulesByTaskId.getOrDefault(t.getId(), new ArrayList<>());
+            List<SimQuestionDto.SimRuleDto> ruleDtos = rules.stream().map(r -> {
+                SimQuestionDto.SimRuleDto rDto = new SimQuestionDto.SimRuleDto();
+                rDto.setId(r.getId());
+                rDto.setScope(r.getScope());
+                rDto.setCondition(r.getCondition());
+                rDto.setScore(r.getScore());
+                return rDto;
+            }).collect(Collectors.toList());
+            tDto.setRules(ruleDtos);
+            
+            // 処理用のテンポラリ情報を保持するラッパークラスを返すのではなく、
+            // groupingBy をシンプルにするために、便宜的に一時的なオブジェクトを作成します
+            return new TaskWrapper(t.getSimQuestionId(), tDto);
+        }).collect(Collectors.groupingBy(TaskWrapper::getQuestionId, 
+                Collectors.mapping(TaskWrapper::getTaskDto, Collectors.toList())));
+
+
+        // 問題エンティティをDTOに変換し、グループ化しておいたタスクをセット
         return questions.stream().map(q -> {
             SimQuestionDto dto = new SimQuestionDto();
             dto.setId(q.getId());
@@ -38,34 +92,26 @@ public class SimQuestionService {
             dto.setCategoryMinorId(q.getCategoryMinorId());
             dto.setInitialConfig(q.getInitialConfig());
 
-            // タスクの取得とマッピング
-            List<SimTask> tasks = simTaskRepository.findBySimQuestionIdOrderBySequenceAsc(q.getId());
-            List<SimQuestionDto.SimTaskDto> taskDtos = tasks.stream().map(t -> {
-                SimQuestionDto.SimTaskDto tDto = new SimQuestionDto.SimTaskDto();
-                tDto.setId(t.getId());
-                tDto.setSequence(t.getSequence());
-                tDto.setInstruction(t.getInstruction());
-                tDto.setExplanation(t.getExplanation());
-
-                // ルールの取得とマッピング
-                List<SimRule> rules = simRuleRepository.findBySimTaskIdOrderByIdAsc(t.getId());
-                List<SimQuestionDto.SimRuleDto> ruleDtos = rules.stream().map(r -> {
-                    SimQuestionDto.SimRuleDto rDto = new SimQuestionDto.SimRuleDto();
-                    rDto.setId(r.getId());
-                    rDto.setScope(r.getScope());
-                    rDto.setCondition(r.getCondition());
-                    rDto.setScore(r.getScore());
-                    return rDto;
-                }).collect(Collectors.toList());
-                tDto.setRules(ruleDtos);
-
-                return tDto;
-            }).collect(Collectors.toList());
-            dto.setTasks(taskDtos);
+            // グループ化しておいたタスクをセット
+            dto.setTasks(taskDtosByQuestionId.getOrDefault(q.getId(), new ArrayList<>()));
 
             return dto;
         }).collect(Collectors.toList());
     }
+
+    // テンポラリクラス（Java内部でのグループ化用）
+    private static class TaskWrapper {
+        private final Long questionId;
+        private final SimQuestionDto.SimTaskDto taskDto;
+
+        public TaskWrapper(Long questionId, SimQuestionDto.SimTaskDto taskDto) {
+            this.questionId = questionId;
+            this.taskDto = taskDto;
+        }
+        public Long getQuestionId() { return questionId; }
+        public SimQuestionDto.SimTaskDto getTaskDto() { return taskDto; }
+    }
+
 
     // 問題の保存（登録・更新）
     @Transactional

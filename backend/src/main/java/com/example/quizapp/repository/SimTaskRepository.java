@@ -10,4 +10,5 @@ import java.util.List;
 public interface SimTaskRepository extends JpaRepository<SimTask, Long> {
     List<SimTask> findBySimQuestionIdOrderBySequenceAsc(Long simQuestionId);
     void deleteBySimQuestionId(Long simQuestionId);
+    List<SimTask> findBySimQuestionIdInOrderBySequenceAsc(List<Long> simQuestionIds);
 }
