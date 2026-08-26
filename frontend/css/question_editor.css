@@ -54,10 +54,6 @@ h1, h2, h3, h4 { color: var(--heading-color); }
     align-items: flex-start; 
 }
 
-@media (max-width: 768px) {
-    .container { flex-direction: column; }
-}
-
 .sidebar { 
     flex: 1; 
     background-color: var(--card-bg); 
@@ -65,6 +61,9 @@ h1, h2, h3, h4 { color: var(--heading-color); }
     border-radius: 8px; 
     border: 1px solid var(--border-color); 
     min-width: 250px; 
+    /* スマホで横にはみ出させない */
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .editor-area { 
@@ -75,9 +74,10 @@ h1, h2, h3, h4 { color: var(--heading-color); }
     border: 1px solid var(--border-color); 
     width: 100%; 
     box-sizing: border-box; 
+    min-width: 0; 
 }
 
-select, input[type="text"], textarea { 
+select, input[type="text"], input[type="number"], textarea { 
     width: 100%; 
     padding: 8px; 
     margin-top: 5px; 
@@ -92,28 +92,42 @@ select, input[type="text"], textarea {
     background-color: var(--bg-color) !important;
 }
 
+/* ★ 修正：リストとアイテムのデザインを最適化 */
 .question-list { 
     list-style: none; 
     padding: 0; 
+    margin: 0;
     max-height: 600px; 
     overflow-y: auto; 
+    overflow-x: hidden;
 }
 
-.question-list li { 
-    padding: 10px; 
+.question-item { 
+    padding: 12px 10px; 
     border-bottom: 1px solid var(--border-color); 
     cursor: pointer; 
+    transition: background-color 0.2s;
+    min-width: 0;
+    overflow: hidden;
 }
 
-.question-list li:hover { 
-    background-color: var(--primary-color); 
-    color: white; 
+.question-item:hover { 
+    background-color: var(--primary-color) !important; 
+    color: white !important; 
+}
+
+.question-item:hover div,
+.question-item:hover span {
+    color: white !important;
 }
 
 .tabs { 
     display: flex; 
     margin-bottom: 20px; 
     border-bottom: 2px solid var(--border-color); 
+    overflow-x: auto; 
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn { 
@@ -138,20 +152,23 @@ select, input[type="text"], textarea {
     display: flex; 
     gap: 10px; 
 }
-.row-group > div { flex: 1; }
+.row-group > div { flex: 1; min-width: 0; }
 
 .image-preview { 
-    max-width: 200px; 
+    max-width: 100%; 
     max-height: 150px; 
     display: block; 
     margin-top: 10px; 
     border-radius: 4px; 
+    object-fit: contain;
 }
 
 .options-header {
     display: flex; 
     justify-content: space-between; 
     align-items: center;
+    flex-wrap: wrap; 
+    gap: 10px;
 }
 
 .options-container { 
@@ -168,11 +185,13 @@ select, input[type="text"], textarea {
     display: flex; 
     align-items: center; 
     gap: 10px; 
+    flex-wrap: wrap; 
 }
 
-.option-item input[type="text"] { 
+.option-item input[type="text"], .option-item textarea { 
     flex: 1; 
     margin: 0; 
+    min-width: 150px;
 }
 
 .is-correct-label { 
@@ -190,6 +209,7 @@ select, input[type="text"], textarea {
     font-weight: bold; 
     color: white; 
     background-color: var(--primary-color); 
+    white-space: nowrap;
 }
 .btn-success { background-color: var(--success-color); }
 .btn-danger { background-color: var(--danger-color); padding: 6px 10px; }
@@ -238,45 +258,111 @@ select, input[type="text"], textarea {
     background-color: var(--border-color);
 }
 
-/* 🍞 トースト通知のスタイル (右下スライドイン版) */
 .toast-notification {
     visibility: hidden;
     min-width: 250px;
-    
-    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
     background-color: var(--bg-card, #ffffff);
     color: var(--text-main, #333333);
     border: 1px solid var(--border, #e2e8f0);
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    
     padding: 15px 20px;
     position: fixed;
     z-index: 9999;
-    
-    /* ① 画面の右下に配置 */
     right: 20px;
     bottom: 20px;
-    
-    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
     transform: translateX(120%);
     opacity: 0;
-    
-    /* 滑らかなスライドアニメーションの設定 */
     transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
-    
     font-size: 0.95em;
     font-weight: bold;
 }
-
-/* 表示された時のクラス（元の位置に戻ってくる） */
 .toast-notification.show {
     visibility: visible;
     opacity: 1;
-    transform: translateX(0); /* 定位置へスライドイン */
+    transform: translateX(0);
 }
-
-/* ダークモード時の影の調整 */
 [data-theme="dark"] .toast-notification {
     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+/* ==========================================
+   スマホ用レスポンシブ対応 (画面幅 768px 以下)
+   ========================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .container { 
+        flex-direction: column; 
+    }
+
+    .header-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .sidebar, .editor-area {
+        width: 100%;
+        padding: 15px;
+        box-sizing: border-box;
+    }
+
+    /* ★ 修正：検索窓とソートのドロップダウンを縦並びに強制 */
+    .sidebar .form-group[style*="display: flex"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+    
+    #sort-select, #search-id-input {
+        width: 100% !important;
+        flex: none !important;
+    }
+
+    /* 問題リスト内のテキストが枠を突き破らないように */
+    .question-list {
+        overflow-x: hidden;
+    }
+
+    .row-group {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .tab-btn {
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+
+    .option-item > div {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 8px;
+    }
+    
+    .option-item textarea.opt-text {
+        width: 100%;
+    }
+
+    .btn {
+        width: 100%;
+        text-align: center;
+        margin-top: 5px;
+    }
+
+    .image-drop-zone {
+        flex-direction: column;
+        align-items: stretch !important;
+        padding: 8px !important;
+    }
+    
+    .image-drop-zone label.btn {
+        width: auto;
+    }
+
+    .options-container {
+        padding-left: 10px;
+    }
 }

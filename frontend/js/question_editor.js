@@ -8,6 +8,31 @@ let currentQuestions = [];
 let currentCategories = []; 
 
 // ==========================================
+// ★ 追加: クリップボードからの画像ペースト (Ctrl+V) 対応
+// ==========================================
+document.addEventListener('paste', async (e) => {
+    const activeEl = document.activeElement;
+    // フォーカスされているのがテキスト入力欄の場合のみ処理
+    if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'text') {
+        if (e.clipboardData && e.clipboardData.files.length > 0) {
+            const file = e.clipboardData.files[0];
+            if (file.type.startsWith('image/')) {
+                e.preventDefault(); // デフォルトのテキスト貼り付けをキャンセル
+                // IDの命名規則からプレビュー先のIDを特定
+                let previewId = '';
+                if (activeEl.id.endsWith('-url')) previewId = activeEl.id.replace('-url', '-preview');
+                else if (activeEl.id.endsWith('-img')) previewId = activeEl.id.replace('-img', '-prev');
+                else if (activeEl.id.endsWith('-input')) previewId = activeEl.id.replace('-input', '-preview');
+
+                if (previewId) {
+                    await uploadFileObject(file, activeEl.id, previewId);
+                }
+            }
+        }
+    }
+});
+
+// ==========================================
 // カテゴリの完全同期機能
 // ==========================================
 function updateDatalists() {
@@ -192,7 +217,7 @@ async function loadQuestions() {
         updateDatalists();
         renderCategoryManager();
         if (typeof renderQuestionList === 'function') renderQuestionList();
-        if (examTab) examTab.style.display = 'none'; // ★ 未選択時は隠す
+        if (examTab) examTab.style.display = 'none'; 
         return;
     }
 
@@ -201,13 +226,12 @@ async function loadQuestions() {
     const selectedOption = selectEl.options[selectEl.selectedIndex];
     const format = (selectedOption.dataset.format || '').toUpperCase(); 
 
-    // タブの表示制御を整理
     document.getElementById('tab-mcq-edit').style.display = 'none';
     document.getElementById('tab-mcq-manual').style.display = 'none';
     document.getElementById('tab-mcq-paste').style.display = 'none';
     document.getElementById('tab-dd-edit').style.display = 'none';
     document.getElementById('tab-sim-edit').style.display = 'none';
-    if (examTab) examTab.style.display = 'none'; // ★ いったん隠す
+    if (examTab) examTab.style.display = 'none';
 
     try {
         if (format.includes('SIM') || format === 'SIMULATION') {
@@ -226,7 +250,6 @@ async function loadQuestions() {
             document.getElementById('tab-mcq-paste').style.display = 'inline-block';
             document.getElementById('tab-dd-edit').style.display = 'inline-block';
             
-            // ★ 選択問題・D&D問題の時は模試設定タブを表示する
             if (examTab) examTab.style.display = 'inline-block';
             
             const resMcq = await fetch(`${API_BASE_URL}/questions?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() });
@@ -299,7 +322,6 @@ function switchTab(tabId) {
     if (tabId === 'bulk-category') {
         renderCategoryTargetList();
     }
-    // ★ 追加: 模試設定タブが開かれたらDBから読み込む
     if (tabId === 'exam-setting') {
         loadExamSetting();
     }
@@ -390,17 +412,16 @@ function getSortedQuestions() {
 function previewImage(inputId, previewId) {
     const url = document.getElementById(inputId).value;
     const img = document.getElementById(previewId);
+    if (!img) return;
     img.style.display = (url && url.startsWith('http')) ? 'block' : 'none';
     img.src = url;
 }
 
-async function uploadImage(fileInput, targetInputId, targetPreviewId) {
-    const file = fileInput.files[0];
-    if (!file) return;
-
+async function uploadFileObject(file, targetInputId, targetPreviewId) {
     const formData = new FormData();
     formData.append('file', file);
     const inputEl = document.getElementById(targetInputId);
+    if (!inputEl) return;
     inputEl.value = "アップロード中...";
 
     try {
@@ -419,9 +440,14 @@ async function uploadImage(fileInput, targetInputId, targetPreviewId) {
     } catch (e) {
         alert("画像のアップロードに失敗しました。");
         inputEl.value = "";
-    } finally {
-        fileInput.value = "";
     }
+}
+
+async function uploadImage(fileInput, targetInputId, targetPreviewId) {
+    const file = fileInput.files[0];
+    if (!file) return;
+    await uploadFileObject(file, targetInputId, targetPreviewId);
+    fileInput.value = ""; 
 }
 
 async function sendQuestionsToBackend(questionsArray) {
@@ -508,6 +534,7 @@ function prepareNewMcq() {
     addOptionUI();
 }
 
+// ★ 修正: 透明な <input type="file"> を被せることでネイティブのD&Dを利用
 function addOptionUIToContainer(text = '', isCorrect = false, imageUrl = '') {
     const optContainer = document.getElementById('options-container');
     const index = optContainer.children.length + 1;
@@ -524,13 +551,16 @@ function addOptionUIToContainer(text = '', isCorrect = false, imageUrl = '') {
             <label class="is-correct-label"><input type="checkbox" class="opt-correct" ${isCorrect ? 'checked' : ''}> 正解</label>
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">削除</button>
         </div>
-        <div style="margin-top: 10px; width:100%;">
-            <input type="text" id="${uniqueId}-input" class="opt-image-url" value="${imageUrl}" placeholder="選択肢の画像URL (任意)" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')">
-            <img id="${uniqueId}-preview" class="image-preview" style="display: ${imageUrl ? 'block' : 'none'};" src="${imageUrl}">
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%;">
+            <input type="text" id="${uniqueId}-input" class="opt-image-url" value="${imageUrl}" placeholder="画像URL (ペースト可)" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
+                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
+                <input type="file" accept="image/*" onchange="uploadImage(this, '${uniqueId}-input', '${uniqueId}-preview')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+            </div>
         </div>
+        <img id="${uniqueId}-preview" class="image-preview" style="display: ${imageUrl ? 'block' : 'none'}; max-width: 200px; margin-top: 10px;" src="${imageUrl}">
     `;
     optContainer.appendChild(div);
-    if(imageUrl) document.getElementById(`${uniqueId}-preview`).src = imageUrl;
 }
 
 function addOptionUI() { addOptionUIToContainer(); }
@@ -601,6 +631,7 @@ function addManualBulkUI() {
     div.style.marginBottom = '25px';
     div.style.padding = '15px';
     
+    // ★ 修正: 手動複数登録の画像エリアをネイティブD&D化
     div.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
             <h4 style="margin:0;">新規問題 (手動) ${manualBulkCount}</h4>
@@ -616,15 +647,27 @@ function addManualBulkUI() {
         <div class="form-group"><label>問題文</label><textarea rows="3"></textarea></div>
         <div class="form-group">
             <label>問題画像URL</label>
-            <input type="text" id="${blockId}-q-img" oninput="previewImage('${blockId}-q-img', '${blockId}-q-prev')">
-            <img id="${blockId}-q-prev" class="image-preview" style="display:none;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="${blockId}-q-img" placeholder="画像URL (ペースト可)" oninput="previewImage('${blockId}-q-img', '${blockId}-q-prev')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
+                    <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
+                    <input type="file" accept="image/*" onchange="uploadImage(this, '${blockId}-q-img', '${blockId}-q-prev')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                </div>
+            </div>
+            <img id="${blockId}-q-prev" class="image-preview" style="display:none; max-width: 200px; margin-top: 10px;">
         </div>
 
         <div class="form-group"><label>解説</label><textarea rows="2"></textarea></div>
         <div class="form-group">
             <label>解説画像URL</label>
-            <input type="text" id="${blockId}-exp-img" oninput="previewImage('${blockId}-exp-img', '${blockId}-exp-prev')">
-            <img id="${blockId}-exp-prev" class="image-preview" style="display:none;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="${blockId}-exp-img" placeholder="画像URL (ペースト可)" oninput="previewImage('${blockId}-exp-img', '${blockId}-exp-prev')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
+                    <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
+                    <input type="file" accept="image/*" onchange="uploadImage(this, '${blockId}-exp-img', '${blockId}-exp-prev')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                </div>
+            </div>
+            <img id="${blockId}-exp-prev" class="image-preview" style="display:none; max-width: 200px; margin-top: 10px;">
         </div>
 
         <div class="options-header" style="margin-top: 15px;">
@@ -658,10 +701,14 @@ function addOptionToManualBlock(containerId) {
             <label class="is-correct-label"><input type="checkbox" class="opt-correct"> 正解</label>
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">削除</button>
         </div>
-        <div style="margin-top: 5px; width:100%;">
-            <input type="text" id="${uniqueId}-input" class="opt-image-url" placeholder="選択肢の画像URL (任意)" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')">
-            <img id="${uniqueId}-preview" class="image-preview" style="display:none;">
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%;">
+            <input type="text" id="${uniqueId}-input" class="opt-image-url" placeholder="画像URL (ペースト可)" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
+                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
+                <input type="file" accept="image/*" onchange="uploadImage(this, '${uniqueId}-input', '${uniqueId}-preview')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+            </div>
         </div>
+        <img id="${uniqueId}-preview" class="image-preview" style="display:none; max-width: 200px; margin-top: 10px;">
     `;
     optContainer.appendChild(div);
 }
@@ -710,8 +757,6 @@ function saveManualBulk() {
 // ==========================================
 // コピペ一括登録・カテゴリ一括設定
 // ==========================================
-
-// ★追加: セル内の改行とダブルクォートを正しく処理するTSVパーサー関数
 function parseTSV(text) {
     const rows = [];
     let currentRow = [];
@@ -724,34 +769,26 @@ function parseTSV(text) {
 
         if (char === '"') {
             if (inQuotes && nextChar === '"') {
-                // エスケープされたダブルクォート（""）の処理
                 currentCell += '"';
-                i++; // 次の文字をスキップ
+                i++;
             } else {
-                // クォーテーションの開始・終了
                 inQuotes = !inQuotes;
             }
         } else if (char === '\t' && !inQuotes) {
-            // 列の区切り（タブ）
             currentRow.push(currentCell);
             currentCell = '';
         } else if (char === '\n' && !inQuotes) {
-            // 行の区切り（改行）
             currentRow.push(currentCell);
             rows.push(currentRow);
             currentRow = [];
             currentCell = '';
         } else if (char === '\r' && !inQuotes) {
-            // Windowsの改行コード(\r\n)の\rを無視
         } else {
-            // 通常の文字
             currentCell += char;
         }
     }
     
-    // 最後のセルと行を追加
     currentRow.push(currentCell);
-    // 空行は除外して追加
     if (currentRow.some(cell => cell.trim() !== '')) {
         rows.push(currentRow);
     }
@@ -759,7 +796,6 @@ function parseTSV(text) {
     return rows;
 }
 
-// ★変更: 入力時のプレビュー件数カウント処理
 document.getElementById('tsv-input')?.addEventListener('input', function() {
     const text = this.value.trim();
     if (!text) { document.getElementById('bulk-preview').textContent = ''; return; }
@@ -768,7 +804,6 @@ document.getElementById('tsv-input')?.addEventListener('input', function() {
     document.getElementById('bulk-preview').textContent = `現在 ${parsedRows.length} 件の問題が認識されています。`;
 });
 
-// ★変更: 一括登録の保存処理
 function savePasteBulk() {
     if (!currentWorkbookId) return alert("問題集を選択してください。");
     const text = document.getElementById('tsv-input').value.trim();
@@ -1000,14 +1035,14 @@ function addDragItemUI(btnElement, itemData = null) {
             <textarea class="drag-item-text" placeholder="テキスト (例: OSPF)" rows="2" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; resize:vertical;">${safeItemText}</textarea>
             <button class="btn btn-outline" onclick="this.parentElement.parentElement.remove()" style="padding: 2px 8px; color: #ef4444; border-color: #ef4444;">×</button>
         </div>
-        <div style="display: flex; gap: 10px; padding-left: 25px;">
-            <input type="text" class="drag-item-img-url" id="url-${uniqueId}" value="${itemUrl}" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" placeholder="画像URL (任意)" style="flex: 1; font-size: 0.85em; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
-            <label class="btn btn-outline" style="cursor: pointer; padding: 2px 8px; font-size: 0.85em; display: flex; align-items: center;">
-                📁 画像を選択
-                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')">
-            </label>
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%; padding-left: 25px;">
+            <input type="text" id="url-${uniqueId}" class="drag-item-img-url" value="${itemUrl}" placeholder="画像URL (ペースト可)" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
+                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
+                <input type="file" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+            </div>
         </div>
-        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px;">
+        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px; margin-top: 10px;">
     `;
     itemsContainer.appendChild(itemDiv);
 }
@@ -1037,14 +1072,14 @@ function addDummyItemUI(dummyData = null) {
             <textarea class="dummy-item-text" placeholder="テキスト (例: Macアドレス)" rows="2" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; resize:vertical;">${safeItemText}</textarea>
             <button class="btn btn-outline" onclick="this.parentElement.parentElement.remove()" style="padding: 2px 8px; color: #ef4444; border-color: #ef4444;">×</button>
         </div>
-        <div style="display: flex; gap: 10px; padding-left: 25px;">
-            <input type="text" class="dummy-item-img-url" id="url-${uniqueId}" value="${itemUrl}" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" placeholder="画像URL (任意)" style="flex: 1; font-size: 0.85em; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
-            <label class="btn btn-outline" style="cursor: pointer; padding: 2px 8px; font-size: 0.85em; display: flex; align-items: center;">
-                📁 画像を選択
-                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')">
-            </label>
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%; padding-left: 25px;">
+            <input type="text" id="url-${uniqueId}" class="dummy-item-img-url" value="${itemUrl}" placeholder="画像URL (ペースト可)" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
+                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
+                <input type="file" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+            </div>
         </div>
-        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px;">
+        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px; margin-top: 10px;">
     `;
     container.appendChild(itemDiv);
 }

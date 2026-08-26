@@ -70,26 +70,19 @@
 
         <div class="editor-area">
             <div class="tabs">
-                <!-- 四択問題用のタブ群（idを付与） -->
+                <!-- 四択問題用のタブ群 -->
                 <button id="tab-mcq-edit" class="tab-btn active" onclick="prepareNewMcq()">個別の編集</button>
                 <button id="tab-mcq-manual" class="tab-btn" onclick="switchTab('manual-bulk')">手動複数登録</button>
                 <button id="tab-mcq-paste" class="tab-btn" onclick="switchTab('paste-bulk')">コピペ一括登録</button>
                 
-                <!-- 常に表示するタブ（idなし＝絶対に消えない） -->
                 <button class="tab-btn" onclick="switchTab('bulk-category')">項目の一括設定</button>
                 <button class="tab-btn" onclick="switchTab('category-manage')">カテゴリ管理</button>
                 
-                <!-- ★ 追加: 模試設定タブ -->
                 <button id="tab-exam-setting" class="tab-btn" onclick="switchTab('exam-setting')" style="display: none;">模試設定</button>
-                
-                <!-- D&D問題用のタブ -->
                 <button id="tab-dd-edit" class="tab-btn" onclick="prepareNewDd()" style="display: none;">D&D問題の作成 新規作成</button>
-                
-                <!-- シミュレーション用のタブ -->
                 <button id="tab-sim-edit" class="tab-btn" onclick="prepareNewSim()" style="display: none;">シミュレーション作成 新規作成</button>
             </div>
 
-            <!-- ★ 追加: 模試設定タブのコンテンツ -->
             <div id="exam-setting-mode" class="tab-content" style="display: none;">
                 <h2>模試設定 (デフォルト値)</h2>
                 <p>模試モードを開始した際に適用されるデフォルトの問題数と制限時間を設定します。</p>
@@ -111,10 +104,7 @@
                 <div class="info-box">
                     ※上から順番に sequence: 1, 2, 3... と自動的に割り当てられます。
                 </div>
-                
-                <div id="category-list-container" style="margin-bottom: 20px;">
-                    </div>
-
+                <div id="category-list-container" style="margin-bottom: 20px;"></div>
                 <button class="btn btn-outline full-width" onclick="addCategoryUI()" style="margin-bottom: 20px;">+ 新しいカテゴリを追加</button>
                 <button class="btn btn-success full-width" onclick="saveCategories()">カテゴリを一括保存する</button>
             </div>
@@ -143,16 +133,17 @@
                     </div>
 
                     <div class="form-group"><label>問題文</label><textarea id="q-text" rows="3"></textarea></div>
+                    
                     <div class="form-group">
                         <label>問題画像</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="text" id="q-image-url" oninput="previewImage('q-image-url', 'q-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
-                            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
-                                📁 画像を選択
+                        <div class="image-drop-zone" data-target-input="q-image-url" data-target-preview="q-image-preview" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                            <input type="text" id="q-image-url" oninput="previewImage('q-image-url', 'q-image-preview')" placeholder="URLを入力、ペースト(Ctrl+V)、または画像をドロップ" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                                📁 選択
                                 <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'q-image-url', 'q-image-preview')">
                             </label>
                         </div>
-                        <img id="q-image-preview" class="image-preview" style="display: none;">
+                        <img id="q-image-preview" class="image-preview" style="display: none; margin-top: 10px; max-width: 200px;">
                     </div>
 
                     <div class="form-group">
@@ -162,14 +153,14 @@
 
                     <div class="form-group">
                         <label>解説画像</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="text" id="q-exp-image-url" oninput="previewImage('q-exp-image-url', 'q-exp-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
-                            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
-                                📁 画像を選択
+                        <div class="image-drop-zone" data-target-input="q-exp-image-url" data-target-preview="q-exp-image-preview" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                            <input type="text" id="q-exp-image-url" oninput="previewImage('q-exp-image-url', 'q-exp-image-preview')" placeholder="URLを入力、ペースト(Ctrl+V)、または画像をドロップ" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                                📁 選択
                                 <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'q-exp-image-url', 'q-exp-image-preview')">
                             </label>
                         </div>
-                        <img id="q-exp-image-preview" class="image-preview" style="display: none;">
+                        <img id="q-exp-image-preview" class="image-preview" style="display: none; margin-top: 10px; max-width: 200px;">
                     </div>
 
                     <div class="options-header">
@@ -264,14 +255,14 @@
 
                 <div class="form-group">
                     <label>問題画像（トポロジ図など）</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="dd-q-image-url" oninput="previewImage('dd-q-image-url', 'dd-q-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
-                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
-                            📁 画像を選択
+                    <div class="image-drop-zone" data-target-input="dd-q-image-url" data-target-preview="dd-q-image-preview" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                        <input type="text" id="dd-q-image-url" oninput="previewImage('dd-q-image-url', 'dd-q-image-preview')" placeholder="URLを入力、ペースト(Ctrl+V)、または画像をドロップ" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                            📁 選択
                             <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'dd-q-image-url', 'dd-q-image-preview')">
                         </label>
                     </div>
-                    <img id="dd-q-image-preview" class="image-preview" style="display: none;">
+                    <img id="dd-q-image-preview" class="image-preview" style="display: none; margin-top: 10px; max-width: 200px;">
                 </div>
 
                 <div class="form-group">
@@ -281,39 +272,33 @@
                 
                 <div class="form-group">
                     <label>解説画像</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="dd-exp-image-url" oninput="previewImage('dd-exp-image-url', 'dd-exp-image-preview')" placeholder="URLを入力、または右からアップロード" style="flex: 1;">
-                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
-                            📁 画像を選択
+                    <div class="image-drop-zone" data-target-input="dd-exp-image-url" data-target-preview="dd-exp-image-preview" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                        <input type="text" id="dd-exp-image-url" oninput="previewImage('dd-exp-image-url', 'dd-exp-image-preview')" placeholder="URLを入力、ペースト(Ctrl+V)、または画像をドロップ" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                            📁 選択
                             <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'dd-exp-image-url', 'dd-exp-image-preview')">
                         </label>
                     </div>
-                    <img id="dd-exp-image-preview" class="image-preview" style="display: none;">
+                    <img id="dd-exp-image-preview" class="image-preview" style="display: none; margin-top: 10px; max-width: 200px;">
                 </div>
 
-                <!-- ドロップゾーン（受け皿）の追加エリア -->
                 <div class="form-group">
                     <label style="font-size: 1.1em; color: var(--primary-color);">📦 ドロップゾーンと正解アイテム</label>
                     <p style="font-size: 0.9em; color: var(--format-text); margin-bottom: 10px;">
                         右側に表示される「受け皿」と、そこに当てはまる正解の「アイテム」をセットで登録します。
                     </p>
-                    <div id="dd-zones-container">
-                        <!-- JSでここにドロップゾーンの枠が追加されます -->
-                    </div>
+                    <div id="dd-zones-container"></div>
                     <button class="btn btn-outline full-width" onclick="addDropZoneUI()">+ 新しいドロップゾーン（箱）を追加</button>
                 </div>
 
                 <hr style="margin: 30px 0; border: none; border-top: 1px dashed #ccc;">
 
-                <!-- ダミーアイテム（引っかけ）の追加エリア -->
                 <div class="form-group">
                     <label style="font-size: 1.1em; color: var(--danger-color);">👻 ダミーアイテム（引っかけの選択肢）</label>
                     <p style="font-size: 0.9em; color: var(--format-text); margin-bottom: 10px;">
                         どの箱にも入らない、不正解用のダミーアイテムを作成します。（空でもOK）
                     </p>
-                    <div id="dd-dummies-container" class="options-container" style="background: var(--bg-color); padding: 15px; border-radius: 8px;">
-                        <!-- JSでここにダミーアイテムが追加されます -->
-                    </div>
+                    <div id="dd-dummies-container" class="options-container" style="background: var(--bg-color); padding: 15px; border-radius: 8px;"></div>
                     <button class="btn btn-outline full-width" onclick="addDummyItemUI()">+ ダミーアイテムを追加</button>
                 </div>
                 
@@ -354,14 +339,14 @@
 
                 <div class="form-group">
                     <label>トポロジ画像 (任意)</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="sim-q-image-url" oninput="previewImage('sim-q-image-url', 'sim-q-image-preview')" placeholder="URLを入力、またはアップロード" style="flex: 1;">
-                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px;">
+                    <div class="image-drop-zone" data-target-input="sim-q-image-url" data-target-preview="sim-q-image-preview" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                        <input type="text" id="sim-q-image-url" oninput="previewImage('sim-q-image-url', 'sim-q-image-preview')" placeholder="URLを入力、ペースト(Ctrl+V)、または画像をドロップ" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                        <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
                             📁 画像を選択
                             <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'sim-q-image-url', 'sim-q-image-preview')">
                         </label>
                     </div>
-                    <img id="sim-q-image-preview" class="image-preview" style="display: none;">
+                    <img id="sim-q-image-preview" class="image-preview" style="display: none; margin-top: 10px; max-width: 200px;">
                 </div>
 
                 <hr style="margin: 30px 0; border: none; border-top: 1px dashed #ccc;">
