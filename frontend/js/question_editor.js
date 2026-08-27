@@ -8,17 +8,116 @@ let currentQuestions = [];
 let currentCategories = []; 
 
 // ==========================================
-// ★ 追加: クリップボードからの画像ペースト (Ctrl+V) 対応
+// ★ 追加: 外部URLを内部サーバーにダウンロードしてURLを置換する処理
+// ==========================================
+async function internalizeImageUrl(url) {
+    if (!url) return url;
+    if (!url.startsWith('http')) return url; // base64や相対パスはそのまま
+    
+    // 自身のサーバーのURLなら何もしない（すでに内部保存済み）
+    const myHost = window.location.origin; 
+    if (url.startsWith(myHost)) return url;
+    if (typeof API_BASE_URL !== 'undefined' && url.startsWith(API_BASE_URL.replace('/api', ''))) return url;
+
+    try {
+        const headers = getAuthHeaders();
+        if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+        const res = await fetch(`${API_BASE_URL}/upload/url`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ url: url })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return data.url; // 内部URLに置き換えて返す
+        }
+    } catch (e) {
+        console.warn("画像内部化エラー", e);
+    }
+    return url; // 失敗したら元の外部URLをそのまま使う
+}
+
+// 登録データのすべてのURLを走査して内部化する共通関数
+async function internalizeAllUrls(requestData) {
+    if (Array.isArray(requestData)) {
+        for (let req of requestData) {
+            if (req.questionImageUrl) req.questionImageUrl = await internalizeImageUrl(req.questionImageUrl);
+            if (req.explanationImageUrl) req.explanationImageUrl = await internalizeImageUrl(req.explanationImageUrl);
+            if (req.options) {
+                for (let opt of req.options) {
+                    if (opt.imageUrl) opt.imageUrl = await internalizeImageUrl(opt.imageUrl);
+                }
+            }
+        }
+    } else {
+        let req = requestData;
+        if (req.questionImageUrl) req.questionImageUrl = await internalizeImageUrl(req.questionImageUrl);
+        if (req.explanationImageUrl) req.explanationImageUrl = await internalizeImageUrl(req.explanationImageUrl);
+        if (req.dragItems) {
+            for (let item of req.dragItems) {
+                if (item.imageUrl) item.imageUrl = await internalizeImageUrl(item.imageUrl);
+            }
+        }
+    }
+    return requestData;
+}
+
+
+// ==========================================
+// 画像ドラッグ＆ドロップ時の画面遷移を無条件で完全ブロック
+// ==========================================
+window.addEventListener('dragenter', (e) => { e.preventDefault(); });
+window.addEventListener('dragover',  (e) => { e.preventDefault(); });
+window.addEventListener('dragleave', (e) => { e.preventDefault(); });
+window.addEventListener('drop',      (e) => { e.preventDefault(); });
+
+document.addEventListener('dragover', (e) => {
+    const dropZone = e.target.closest('.image-drop-zone');
+    if (dropZone) {
+        dropZone.style.borderColor = 'var(--primary, #3b82f6)';
+        dropZone.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+    }
+});
+
+document.addEventListener('dragleave', (e) => {
+    const dropZone = e.target.closest('.image-drop-zone');
+    if (dropZone && (!e.relatedTarget || !dropZone.contains(e.relatedTarget))) {
+        dropZone.style.borderColor = 'var(--border, #e2e8f0)';
+        dropZone.style.backgroundColor = 'var(--bg-main, #f1f5f9)';
+    }
+});
+
+document.addEventListener('drop', async (e) => {
+    document.querySelectorAll('.image-drop-zone').forEach(zone => {
+        zone.style.borderColor = 'var(--border, #e2e8f0)';
+        zone.style.backgroundColor = 'var(--bg-main, #f1f5f9)';
+    });
+
+    const dropZone = e.target.closest('.image-drop-zone');
+    if (dropZone && e.dataTransfer && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (file.type.startsWith('image/')) {
+            const inputId = dropZone.getAttribute('data-target-input');
+            const previewId = dropZone.getAttribute('data-target-preview');
+            if(inputId && previewId) {
+                await uploadFileObject(file, inputId, previewId);
+            }
+        } else {
+            alert("画像ファイルのみドロップ可能です。");
+        }
+    }
+});
+
+// ==========================================
+// クリップボードからの画像ペースト (Ctrl+V) 対応
 // ==========================================
 document.addEventListener('paste', async (e) => {
     const activeEl = document.activeElement;
-    // フォーカスされているのがテキスト入力欄の場合のみ処理
     if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'text') {
         if (e.clipboardData && e.clipboardData.files.length > 0) {
             const file = e.clipboardData.files[0];
             if (file.type.startsWith('image/')) {
-                e.preventDefault(); // デフォルトのテキスト貼り付けをキャンセル
-                // IDの命名規則からプレビュー先のIDを特定
+                e.preventDefault(); 
                 let previewId = '';
                 if (activeEl.id.endsWith('-url')) previewId = activeEl.id.replace('-url', '-preview');
                 else if (activeEl.id.endsWith('-img')) previewId = activeEl.id.replace('-img', '-prev');
@@ -452,13 +551,21 @@ async function uploadImage(fileInput, targetInputId, targetPreviewId) {
 
 async function sendQuestionsToBackend(questionsArray) {
     try {
+        // ★ 追加: 保存処理前に外部URLを内部サーバーにダウンロード
+        if(typeof showToast === 'function') showToast('画像を内部サーバーに保存しています...');
+        questionsArray = await internalizeAllUrls(questionsArray);
+        if(typeof showToast === 'function') showToast('問題データを保存しています...');
+
         const response = await fetch(`${API_BASE_URL}/questions/bulk`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(questionsArray)
         });
         if (!response.ok) throw new Error(`サーバーエラー: ${response.status}`);
-        alert('保存に成功しました！');
+        
+        if(typeof showToast === 'function') showToast('保存に成功しました！');
+        else alert('保存に成功しました！');
+        
         loadQuestions();
     } catch (error) {
         alert('保存に失敗しました。バックエンドが起動しているか確認してください。');
@@ -534,7 +641,6 @@ function prepareNewMcq() {
     addOptionUI();
 }
 
-// ★ 修正: 透明な <input type="file"> を被せることでネイティブのD&Dを利用
 function addOptionUIToContainer(text = '', isCorrect = false, imageUrl = '') {
     const optContainer = document.getElementById('options-container');
     const index = optContainer.children.length + 1;
@@ -551,12 +657,12 @@ function addOptionUIToContainer(text = '', isCorrect = false, imageUrl = '') {
             <label class="is-correct-label"><input type="checkbox" class="opt-correct" ${isCorrect ? 'checked' : ''}> 正解</label>
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">削除</button>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%;">
-            <input type="text" id="${uniqueId}-input" class="opt-image-url" value="${imageUrl}" placeholder="画像URL (ペースト可)" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
-            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
-                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
-                <input type="file" accept="image/*" onchange="uploadImage(this, '${uniqueId}-input', '${uniqueId}-preview')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-            </div>
+        <div class="image-drop-zone" data-target-input="${uniqueId}-input" data-target-preview="${uniqueId}-preview" style="margin-top: 10px; width:100%; display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+            <input type="text" id="${uniqueId}-input" class="opt-image-url" value="${imageUrl}" placeholder="画像URL (任意) - または画像をドロップ" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                📁 選択
+                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, '${uniqueId}-input', '${uniqueId}-preview')">
+            </label>
         </div>
         <img id="${uniqueId}-preview" class="image-preview" style="display: ${imageUrl ? 'block' : 'none'}; max-width: 200px; margin-top: 10px;" src="${imageUrl}">
     `;
@@ -631,7 +737,6 @@ function addManualBulkUI() {
     div.style.marginBottom = '25px';
     div.style.padding = '15px';
     
-    // ★ 修正: 手動複数登録の画像エリアをネイティブD&D化
     div.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
             <h4 style="margin:0;">新規問題 (手動) ${manualBulkCount}</h4>
@@ -647,12 +752,12 @@ function addManualBulkUI() {
         <div class="form-group"><label>問題文</label><textarea rows="3"></textarea></div>
         <div class="form-group">
             <label>問題画像URL</label>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="text" id="${blockId}-q-img" placeholder="画像URL (ペースト可)" oninput="previewImage('${blockId}-q-img', '${blockId}-q-prev')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
-                <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
-                    <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
-                    <input type="file" accept="image/*" onchange="uploadImage(this, '${blockId}-q-img', '${blockId}-q-prev')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-                </div>
+            <div class="image-drop-zone" data-target-input="${blockId}-q-img" data-target-preview="${blockId}-q-prev" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                <input type="text" id="${blockId}-q-img" placeholder="画像をドロップ" oninput="previewImage('${blockId}-q-img', '${blockId}-q-prev')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                    📁 選択
+                    <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, '${blockId}-q-img', '${blockId}-q-prev')">
+                </label>
             </div>
             <img id="${blockId}-q-prev" class="image-preview" style="display:none; max-width: 200px; margin-top: 10px;">
         </div>
@@ -660,12 +765,12 @@ function addManualBulkUI() {
         <div class="form-group"><label>解説</label><textarea rows="2"></textarea></div>
         <div class="form-group">
             <label>解説画像URL</label>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="text" id="${blockId}-exp-img" placeholder="画像URL (ペースト可)" oninput="previewImage('${blockId}-exp-img', '${blockId}-exp-prev')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
-                <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
-                    <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
-                    <input type="file" accept="image/*" onchange="uploadImage(this, '${blockId}-exp-img', '${blockId}-exp-prev')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-                </div>
+            <div class="image-drop-zone" data-target-input="${blockId}-exp-img" data-target-preview="${blockId}-exp-prev" style="display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+                <input type="text" id="${blockId}-exp-img" placeholder="画像をドロップ" oninput="previewImage('${blockId}-exp-img', '${blockId}-exp-prev')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+                <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                    📁 選択
+                    <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, '${blockId}-exp-img', '${blockId}-exp-prev')">
+                </label>
             </div>
             <img id="${blockId}-exp-prev" class="image-preview" style="display:none; max-width: 200px; margin-top: 10px;">
         </div>
@@ -701,12 +806,12 @@ function addOptionToManualBlock(containerId) {
             <label class="is-correct-label"><input type="checkbox" class="opt-correct"> 正解</label>
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">削除</button>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%;">
-            <input type="text" id="${uniqueId}-input" class="opt-image-url" placeholder="画像URL (ペースト可)" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
-            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
-                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
-                <input type="file" accept="image/*" onchange="uploadImage(this, '${uniqueId}-input', '${uniqueId}-preview')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-            </div>
+        <div class="image-drop-zone" data-target-input="${uniqueId}-input" data-target-preview="${uniqueId}-preview" style="margin-top: 5px; width:100%; display: flex; gap: 10px; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-main); transition: 0.2s;">
+            <input type="text" id="${uniqueId}-input" class="opt-image-url" placeholder="画像URL (任意) - またはドロップ" oninput="previewImage('${uniqueId}-input', '${uniqueId}-preview')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
+            <label class="btn btn-outline" style="cursor: pointer; display: flex; align-items: center; padding: 0 15px; margin: 0; background: var(--bg-card);">
+                📁 選択
+                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, '${uniqueId}-input', '${uniqueId}-preview')">
+            </label>
         </div>
         <img id="${uniqueId}-preview" class="image-preview" style="display:none; max-width: 200px; margin-top: 10px;">
     `;
@@ -1035,14 +1140,14 @@ function addDragItemUI(btnElement, itemData = null) {
             <textarea class="drag-item-text" placeholder="テキスト (例: OSPF)" rows="2" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; resize:vertical;">${safeItemText}</textarea>
             <button class="btn btn-outline" onclick="this.parentElement.parentElement.remove()" style="padding: 2px 8px; color: #ef4444; border-color: #ef4444;">×</button>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%; padding-left: 25px;">
-            <input type="text" id="url-${uniqueId}" class="drag-item-img-url" value="${itemUrl}" placeholder="画像URL (ペースト可)" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
-            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
-                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
-                <input type="file" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-            </div>
+        <div class="image-drop-zone" data-target-input="url-${uniqueId}" data-target-preview="prev-${uniqueId}" style="display: flex; gap: 10px; padding-left: 25px; padding-top: 5px; padding-bottom: 5px; border: 2px dashed transparent; border-radius: 8px; transition: 0.2s;">
+            <input type="text" class="drag-item-img-url" id="url-${uniqueId}" value="${itemUrl}" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" placeholder="画像URL (任意) - またはドロップ" style="flex: 1; font-size: 0.85em; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            <label class="btn btn-outline" style="cursor: pointer; padding: 2px 8px; font-size: 0.85em; display: flex; align-items: center; margin: 0;">
+                📁 選択
+                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')">
+            </label>
         </div>
-        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px; margin-top: 10px;">
+        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px;">
     `;
     itemsContainer.appendChild(itemDiv);
 }
@@ -1072,14 +1177,14 @@ function addDummyItemUI(dummyData = null) {
             <textarea class="dummy-item-text" placeholder="テキスト (例: Macアドレス)" rows="2" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; resize:vertical;">${safeItemText}</textarea>
             <button class="btn btn-outline" onclick="this.parentElement.parentElement.remove()" style="padding: 2px 8px; color: #ef4444; border-color: #ef4444;">×</button>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; width:100%; padding-left: 25px;">
-            <input type="text" id="url-${uniqueId}" class="dummy-item-img-url" value="${itemUrl}" placeholder="画像URL (ペースト可)" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 6px;">
-            <div style="position: relative; overflow: hidden; border: 2px dashed #94a3b8; background: #f8fafc; padding: 6px 15px; border-radius: 6px; cursor: pointer;">
-                <span style="font-size: 0.85em; font-weight: bold; color: #475569;">📥 ドロップ or 選択</span>
-                <input type="file" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-            </div>
+        <div class="image-drop-zone" data-target-input="url-${uniqueId}" data-target-preview="prev-${uniqueId}" style="display: flex; gap: 10px; padding-left: 25px; padding-top: 5px; padding-bottom: 5px; border: 2px dashed transparent; border-radius: 8px; transition: 0.2s;">
+            <input type="text" class="dummy-item-img-url" id="url-${uniqueId}" value="${itemUrl}" oninput="previewImage('url-${uniqueId}', 'prev-${uniqueId}')" placeholder="画像URL (任意) - またはドロップ" style="flex: 1; font-size: 0.85em; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            <label class="btn btn-outline" style="cursor: pointer; padding: 2px 8px; font-size: 0.85em; display: flex; align-items: center; margin: 0;">
+                📁 選択
+                <input type="file" style="display: none;" accept="image/*" onchange="uploadImage(this, 'url-${uniqueId}', 'prev-${uniqueId}')">
+            </label>
         </div>
-        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px; margin-top: 10px;">
+        <img id="prev-${uniqueId}" class="image-preview" src="${itemUrl}" style="display: ${displayStyle}; max-width: 150px; margin-left: 25px;">
     `;
     container.appendChild(itemDiv);
 }
@@ -1134,6 +1239,11 @@ async function saveDdQuestion() {
     try {
         const saveBtn = event.target;
         saveBtn.disabled = true;
+        saveBtn.textContent = "画像を内部に保存中...";
+        
+        // ★ 追加: 外部URLを一括でダウンロード・内部化
+        await internalizeAllUrls(requestData);
+        
         saveBtn.textContent = "保存中...";
         const response = await fetch(`${API_BASE_URL}/dd-questions`, {
             method: 'POST',
@@ -1452,6 +1562,14 @@ async function saveSimQuestion() {
     };
 
     try {
+        const saveBtn = document.getElementById('sim-btn-save');
+        saveBtn.disabled = true;
+        saveBtn.textContent = "画像を内部に保存中...";
+        
+        // ★ 追加: 外部URLを一括でダウンロード・内部化
+        await internalizeAllUrls(requestData);
+
+        saveBtn.textContent = "保存中...";
         const response = await fetch(`${API_BASE_URL}/sim-questions`, {
             method: 'POST',
             headers: getAuthHeaders(),
@@ -1461,7 +1579,10 @@ async function saveSimQuestion() {
         alert('シミュレーション問題を保存しました！');
         loadQuestions();
         prepareNewSim();
-    } catch (e) { alert('保存に失敗しました。'); }
+    } catch (e) { alert('保存に失敗しました。'); } finally {
+        const saveBtn = document.getElementById('sim-btn-save');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "新規問題として保存する"; }
+    }
 }
 
 async function deleteSimQuestion() {
