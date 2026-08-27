@@ -2,6 +2,8 @@ package com.example.quizapp.controller;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,23 +25,22 @@ public class ImageUploadController {
         try {
             Path uploadPath = Paths.get(UPLOAD_DIR);
             if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath); // フォルダが無ければ作る
+                Files.createDirectories(uploadPath);
             }
-            // ランダムな文字列を付けてファイル名の被りを防ぐ
             String filename = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
             Path filePath = uploadPath.resolve(filename);
-            
             Files.copy(file.getInputStream(), filePath);
             
-            // 配信用のURLを返す
-            String imageUrl = "http://localhost:8080/uploads/" + filename;
+            // ★ 修正: ローカルと本番(Render)のURLを自動で判別して組み立てる
+            String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+            String imageUrl = baseUrl + "/uploads/" + filename;
+            
             return "{\"url\": \"" + imageUrl + "\"}";
         } catch (IOException e) {
             throw new RuntimeException("画像のアップロードに失敗しました", e);
         }
     }
 
-    // ★ 追加：外部URLから画像をダウンロードして内部に保存するAPI
     @PostMapping("/url")
     public String uploadImageFromUrl(@RequestBody Map<String, String> payload) {
         String targetUrl = payload.get("url");
@@ -69,7 +70,6 @@ public class ImageUploadController {
             
             URL url = new URL(targetUrl);
             URLConnection connection = url.openConnection();
-            // 外部サイトのブロック（403 Forbiddenなど）を回避するためにブラウザのフリをする
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(5000);
@@ -78,8 +78,10 @@ public class ImageUploadController {
                 Files.copy(in, filePath);
             }
             
-            // 配信用のURLを返す
-            String imageUrl = "http://localhost:8080/uploads/" + filename;
+            // ★ 修正: ローカルと本番(Render)のURLを自動で判別して組み立てる
+            String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+            String imageUrl = baseUrl + "/uploads/" + filename;
+            
             return "{\"url\": \"" + imageUrl + "\"}";
         } catch (Exception e) {
             throw new RuntimeException("画像のダウンロードに失敗しました", e);
