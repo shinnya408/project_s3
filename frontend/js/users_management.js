@@ -1,3 +1,4 @@
+// users_management.js
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadWorkbooks();
@@ -13,7 +14,6 @@ async function loadWorkbooks() {
         const select = document.getElementById('workbook-select');
         select.innerHTML = '<option value="">-- 問題集を選択 --</option>';
         workbooks.forEach(wb => {
-            // ★ 修正: data-format 属性を追加
             select.innerHTML += `<option value="${wb.id}" data-format="${wb.format}">${wb.name}</option>`;
         });
     } catch (e) {
@@ -33,19 +33,20 @@ async function loadUsers() {
         users.forEach(user => {
             const roleSelectDisabled = myRole === 'ADMIN' ? '' : 'disabled';
             
+            // ★ 修正: インラインスタイルを削り、スマホ表示用の data-label を付与
             tbody.innerHTML += `
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 10px;">${user.id}</td>
-                    <td style="padding: 10px; font-weight: bold;">${user.username}</td>
-                    <td style="padding: 10px; color: var(--text-sub);">${user.email}</td>
-                    <td style="padding: 10px;">
+                <tr class="user-row">
+                    <td data-label="ID">${user.id}</td>
+                    <td data-label="ユーザー名" style="font-weight: bold;">${user.username}</td>
+                    <td data-label="メールアドレス" style="color: var(--text-sub);">${user.email}</td>
+                    <td data-label="権限">
                         <select class="form-control" style="width: auto; padding: 4px;" onchange="changeRole(${user.id}, this.value)" ${roleSelectDisabled}>
                             <option value="USER" ${user.role === 'USER' ? 'selected' : ''}>一般 (USER)</option>
                             <option value="MANAGER" ${user.role === 'MANAGER' ? 'selected' : ''}>マネージャー</option>
                             <option value="ADMIN" ${user.role === 'ADMIN' ? 'selected' : ''}>管理者 (ADMIN)</option>
                         </select>
                     </td>
-                    <td style="padding: 10px; text-align: center; display: flex; gap: 5px; justify-content: center;">
+                    <td data-label="操作" class="action-cell">
                         <button class="btn btn-primary btn-sm" onclick="viewStats(${user.id}, '${user.username}')">📊 成績を見る</button>
                         ${myRole === 'ADMIN' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">🗑️</button>` : ''}
                     </td>
@@ -89,17 +90,14 @@ function viewStats(userId, username) {
     
     if (!wbId) return alert('上のプルダウンから、進捗を確認したい「問題集」を選択してください。');
     
-    // ★ 追加: 選択された問題集のフォーマットを取得
     const selectedOption = select.options[select.selectedIndex];
     const format = selectedOption.getAttribute('data-format');
     
     const queryParams = `?workbookId=${wbId}&targetUserId=${userId}&targetUserName=${encodeURIComponent(username)}`;
 
-    // ★ 修正: フォーマットによって遷移先を分岐
     if (format === 'SIMULATION') {
         window.location.href = `sim_menu${queryParams}`;
     } else {
-        // 通常の選択式・D&D問題集の場合（直接statsではなく、履歴も選べるmenu画面に飛ばすのが自然です）
         window.location.href = `player_menu${queryParams}`;
     }
 }

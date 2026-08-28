@@ -107,6 +107,10 @@ body {
 .btn-next:hover { background: var(--primary-hover); }
 .btn-outline { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); }
 
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-danger { background: var(--danger-color); color: #fff; }
+.btn-sm { padding: 6px 12px; font-size: 0.85em; }
+
 /* ====== ダークモード用カラー ====== */
 [data-theme="dark"] {
     --bg-main: #0f172a;
@@ -200,17 +204,13 @@ summary:hover {
    ========================================== */
 .table-responsive {
     width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     margin-top: 20px;
     border-radius: 6px;
-    border: 1px solid var(--border);
 }
 
 .user-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 600px; /* スマホで表が潰れすぎないように最低幅を確保 */
 }
 
 .user-table th, .user-table td {
@@ -226,6 +226,12 @@ summary:hover {
     white-space: nowrap;
 }
 
+.action-cell {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
 /* ==========================================
    スマホ用レスポンシブ対応 (画面幅 768px 以下)
    ========================================== */
@@ -235,25 +241,83 @@ summary:hover {
     }
 
     .mobile-container {
-        margin-top: 50px !important; /* テーマボタンと被らないように */
+        margin-top: 50px !important;
         padding: 20px 15px;
     }
 
-    /* ヘッダーを縦並びに */
     .header {
         flex-direction: column;
         align-items: flex-start;
         gap: 15px;
     }
 
-    /* トップへ戻るボタンなどを横幅いっぱいに */
     .header .btn {
         width: 100%;
         text-align: center;
     }
 
-    /* プルダウンの幅制限を解除 */
     select#workbook-select {
         max-width: 100% !important;
+    }
+
+    /* ★ 追加: スマホではテーブルを「カード型」に変形させる */
+    .user-table thead {
+        display: none; /* スマホでは見出し行を消す */
+    }
+    
+    .user-table, .user-table tbody, .user-table tr, .user-table td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .user-row {
+        margin-bottom: 15px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-card);
+        overflow: hidden;
+    }
+
+    .user-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+        border-bottom: 1px dashed var(--border);
+        padding: 10px 15px;
+    }
+
+    .user-table td:last-child {
+        border-bottom: none;
+    }
+
+    /* 裏に仕込んだ data-label の文字を左側に表示する */
+    .user-table td::before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: var(--text-sub);
+        margin-right: 10px;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .user-table td.action-cell {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+
+    .user-table td.action-cell::before {
+        align-self: flex-start;
+        margin-bottom: 5px;
+    }
+
+    .user-table td.action-cell button {
+        width: 100%;
+    }
+    
+    .user-table td select {
+        max-width: 65%;
     }
 }
