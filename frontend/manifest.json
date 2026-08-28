@@ -2,7 +2,7 @@
   "name": "Project S³",
   "short_name": "Pro-S³",
   "description": "通勤・スキマ時間でサクサク資格勉強！",
-  "start_url": "./index.html",
+  "start_url": "./index",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#3b82f6",

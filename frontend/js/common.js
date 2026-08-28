@@ -1,5 +1,5 @@
 const API_BASE_URL = 'https://project-s3.onrender.com/api';
-// const API_BASE_URL = 'http://localhost:8080/api';
+//const API_BASE_URL = 'http://localhost:8080/api';
 
 function initTheme() {
       if (localStorage.getItem('theme') === 'dark') {
@@ -75,3 +75,42 @@ function getAuthHeaders() {
         'X-User-Role': role
     };
 }
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 既にローディング画面がある場合や、API_BASE_URLが未定義のページでは何もしない
+    if (document.getElementById('initial-loader') || typeof API_BASE_URL === 'undefined') return;
+
+    // ローディング画面をJavaScriptで動的に作って画面（body）に追加する
+    const loader = document.createElement('div');
+    loader.id = 'initial-loader';
+    loader.className = 'initial-loader';
+    loader.innerHTML = `
+        <div class="spinner"></div>
+        <h2 style="margin-bottom: 10px;">サーバーを起動しています...</h2>
+        <p style="color: #64748b; font-size: 0.9em; text-align: center; line-height: 1.5;">
+            無料サーバーを利用しているため、<br>初回起動に最大1分ほどかかる場合があります。
+        </p>
+    `;
+    document.body.appendChild(loader);
+
+    try {
+        // バックエンドを起こすための通信
+        await fetch(`${API_BASE_URL}/workbooks`, { 
+            method: 'GET',
+            headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+        });
+
+        // 応答があったら消す
+        hideLoader();
+    } catch (error) {
+        console.error("サーバー起動チェックエラー:", error);
+        hideLoader(); // エラー時も一生止まらないように消す
+    }
+
+    function hideLoader() {
+        loader.classList.add('hidden');
+        setTimeout(() => {
+            if (loader.parentNode) loader.parentNode.removeChild(loader);
+        }, 500);
+    }
+});

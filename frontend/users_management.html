@@ -2,8 +2,11 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <!-- ★ 追加: スマホ対応の必須タグ -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ユーザー管理</title>
     <link rel="stylesheet" href="css/exam_config.css">
+    <link rel="stylesheet" href="css/common.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="image/icon-192.png">
     <meta name="theme-color" content="#3b82f6">
@@ -12,10 +15,10 @@
     <!-- トースト通知用のコンテナ -->
     <div id="toast-container" class="toast-notification"></div>
     
-    <!-- ★ 追加：テーマ切り替えボタン -->
+    <!-- テーマ切り替えボタン -->
     <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="ライト/ダーク切替">🌙</button>
 
-    <div class="container" style="max-width: 900px; margin-top: 40px;">
+    <div class="container mobile-container">
         <div class="header">
             <h1 style="margin: 0; font-size: 1.5em;">👥 ユーザー管理ダッシュボード</h1>
             <button class="btn btn-outline" onclick="window.location.href='index'">← トップへ戻る</button>
@@ -32,20 +35,23 @@
             </select>
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-            <thead>
-                <tr style="background: var(--bg-main); border-bottom: 2px solid var(--border);">
-                    <th style="padding: 10px; text-align: left;">ID</th>
-                    <th style="padding: 10px; text-align: left;">ユーザー名</th>
-                    <th style="padding: 10px; text-align: left;">メールアドレス</th>
-                    <th style="padding: 10px; text-align: left;">権限</th>
-                    <th style="padding: 10px; text-align: center;">操作</th>
-                </tr>
-            </thead>
-            <tbody id="user-list">
-                <tr><td colspan="5" style="text-align: center; padding: 20px;">読込中...</td></tr>
-            </tbody>
-        </table>
+        <!-- ★ 修正: テーブルを横スクロール可能なラッパーで囲む -->
+        <div class="table-responsive">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>ユーザー名</th>
+                        <th>メールアドレス</th>
+                        <th>権限</th>
+                        <th style="text-align: center;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="user-list">
+                    <tr><td colspan="5" style="text-align: center; padding: 20px;">読込中...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     <script src="js/common.js"></script>
     <script src="js/users_management.js"></script>

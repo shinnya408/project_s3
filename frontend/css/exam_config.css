@@ -100,10 +100,12 @@ body {
     cursor: pointer;
     font-size: 1em;
     border: none;
+    box-sizing: border-box;
 }
 .btn-back { background: #cbd5e1; color: var(--text-main); }
 .btn-next { background: var(--primary); color: #fff; }
 .btn-next:hover { background: var(--primary-hover); }
+.btn-outline { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); }
 
 /* ====== ダークモード用カラー ====== */
 [data-theme="dark"] {
@@ -115,7 +117,6 @@ body {
     --primary: #60a5fa;
 }
 
-/* ダークモード時の入力フォームの背景色などを調整 */
 [data-theme="dark"] .form-control {
     background-color: var(--bg-main);
     color: var(--text-main);
@@ -169,41 +170,90 @@ summary:hover {
 .toast-notification {
     visibility: hidden;
     min-width: 250px;
-    
-    /* ④ 丸角四角形の薄い色の背景（アプリのテーマカラーに追従します） */
     background-color: var(--bg-card, #ffffff);
     color: var(--text-main, #333333);
     border: 1px solid var(--border, #e2e8f0);
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    
     padding: 15px 20px;
     position: fixed;
     z-index: 9999;
-    
-    /* ① 画面の右下に配置 */
     right: 20px;
     bottom: 20px;
-    
-    /* ③ スライドイン前の状態（画面の右外にはみ出させて隠す） */
     transform: translateX(120%);
     opacity: 0;
-    
-    /* 滑らかなスライドアニメーションの設定 */
     transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
-    
     font-size: 0.95em;
     font-weight: bold;
 }
-
-/* 表示された時のクラス（元の位置に戻ってくる） */
 .toast-notification.show {
     visibility: visible;
     opacity: 1;
-    transform: translateX(0); /* 定位置へスライドイン */
+    transform: translateX(0);
 }
-
-/* ダークモード時の影の調整 */
 [data-theme="dark"] .toast-notification {
     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+/* ==========================================
+   テーブル用スタイル（ユーザー管理画面等）
+   ========================================== */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 20px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px; /* スマホで表が潰れすぎないように最低幅を確保 */
+}
+
+.user-table th, .user-table td {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.user-table th {
+    background: var(--bg-main);
+    border-bottom: 2px solid var(--border);
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* ==========================================
+   スマホ用レスポンシブ対応 (画面幅 768px 以下)
+   ========================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .mobile-container {
+        margin-top: 50px !important; /* テーマボタンと被らないように */
+        padding: 20px 15px;
+    }
+
+    /* ヘッダーを縦並びに */
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    /* トップへ戻るボタンなどを横幅いっぱいに */
+    .header .btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* プルダウンの幅制限を解除 */
+    select#workbook-select {
+        max-width: 100% !important;
+    }
 }
