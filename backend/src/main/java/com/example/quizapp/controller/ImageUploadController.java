@@ -16,23 +16,28 @@ import java.util.UUID;
 @RequestMapping("/api/upload")
 public class ImageUploadController {
 
-    // application.properties または 環境変数から取得
     @Value("${SUPABASE_URL:}")
     private String supabaseUrl;
 
     @Value("${SUPABASE_KEY:}")
     private String supabaseKey;
 
-    // Supabaseに作成したバケット名
     private final String BUCKET_NAME = "uploads";
 
     @PostMapping
     public String uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             String originalName = file.getOriginalFilename();
-            String filename = UUID.randomUUID().toString() + "_" + originalName;
+            String extension = "";
             
-            // ローカル保存をやめ、直接Supabaseへアップロード
+            // ★ 修正: 元のファイル名から「拡張子（.pngなど）」だけを抜き出す
+            if (originalName != null && originalName.lastIndexOf(".") > -1) {
+                extension = originalName.substring(originalName.lastIndexOf("."));
+            }
+            
+            // ★ 修正: 日本語名を除外して、UUIDと拡張子だけで安全な名前を作る
+            String filename = UUID.randomUUID().toString() + extension;
+            
             String imageUrl = uploadToSupabase(file.getBytes(), filename, file.getContentType());
             return "{\"url\": \"" + imageUrl + "\"}";
         } catch (Exception e) {
@@ -47,21 +52,20 @@ public class ImageUploadController {
             throw new RuntimeException("URLが指定されていません");
         }
         try {
-            String originalName = "downloaded_image.jpg";
+            String extension = ".jpg"; // デフォルト
             try {
                 URL url = new URL(targetUrl);
                 String path = url.getPath();
-                String name = path.substring(path.lastIndexOf('/') + 1);
-                if (name.contains(".")) {
-                    originalName = name;
+                if (path.contains(".")) {
+                    extension = path.substring(path.lastIndexOf('.'));
                 }
             } catch (Exception e) {
-                // 無視してデフォルト名を使用
+                // 無視してデフォルト拡張子を使用
             }
             
-            String filename = UUID.randomUUID().toString() + "_" + originalName;
+            // ★ 修正: こちらもランダム英数字＋拡張子だけにする
+            String filename = UUID.randomUUID().toString() + extension;
             
-            // 外部URLから画像をメモリ上にダウンロード
             URL url = new URL(targetUrl);
             URLConnection connection = url.openConnection();
             connection.setRequestProperty("User-Agent", "Mozilla/5.0");
@@ -76,7 +80,6 @@ public class ImageUploadController {
             String contentType = connection.getContentType();
             if (contentType == null) contentType = "image/jpeg";
 
-            // 直接Supabaseへアップロード
             String imageUrl = uploadToSupabase(imageBytes, filename, contentType);
             
             return "{\"url\": \"" + imageUrl + "\"}";
@@ -85,28 +88,23 @@ public class ImageUploadController {
         }
     }
 
-    // Supabase StorageのAPIを叩いて画像を保存し、公開URLを返す共通メソッド
     private String uploadToSupabase(byte[] fileBytes, String filename, String contentType) {
         if (supabaseUrl == null || supabaseUrl.isEmpty() || supabaseKey == null || supabaseKey.isEmpty()) {
             throw new RuntimeException("SupabaseのURLまたはキーが設定されていません");
         }
 
         RestTemplate restTemplate = new RestTemplate();
-        
-        // アップロード用APIエンドポイント
         String uploadEndpoint = supabaseUrl + "/storage/v1/object/" + BUCKET_NAME + "/" + filename;
         
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(supabaseKey); // 認証キーをセット
+        headers.setBearerAuth(supabaseKey);
         headers.setContentType(MediaType.parseMediaType(contentType));
         
         HttpEntity<byte[]> requestEntity = new HttpEntity<>(fileBytes, headers);
         
-        // Supabaseへ送信
         ResponseEntity<String> response = restTemplate.exchange(uploadEndpoint, HttpMethod.POST, requestEntity, String.class);
         
         if (response.getStatusCode().is2xxSuccessful()) {
-            // 成功した場合、パブリック(公開)URLを組み立てて返す
             return supabaseUrl + "/storage/v1/object/public/" + BUCKET_NAME + "/" + filename;
         } else {
             throw new RuntimeException("Supabaseへのアップロード失敗: " + response.getBody());
