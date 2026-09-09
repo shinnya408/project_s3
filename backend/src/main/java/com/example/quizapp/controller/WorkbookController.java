@@ -13,11 +13,11 @@ public class WorkbookController {
 
     private final WorkbookRepository workbookRepository;
 
-
-    // 問題集一覧を返すAPI (GET /api/workbooks)
+    // 問題集一覧を返すAPI
     @GetMapping
     public List<Workbook> getAllWorkbooks() {
-        return workbookRepository.findByDeletedFalse();
+        // ★ 修正: ID順に並べたものを取得するメソッドに変更
+        return workbookRepository.findByDeletedFalseOrderByIdAsc();
     }
 
     @PostMapping

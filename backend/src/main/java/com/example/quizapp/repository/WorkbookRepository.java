@@ -8,5 +8,5 @@ import java.util.List;
 @Repository
 public interface WorkbookRepository extends JpaRepository<Workbook, Long> {
     // 削除フラグ(deleted)がfalseのものだけを取得するメソッド
-    List<Workbook> findByDeletedFalse();
+    List<Workbook> findByDeletedFalseOrderByIdAsc();
 }
