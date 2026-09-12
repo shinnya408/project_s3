@@ -6,6 +6,25 @@ if (localStorage.getItem("theme") === "dark" || (!localStorage.getItem("theme") 
 let currentWorkbookId = null;
 let currentQuestions = []; 
 let currentCategories = []; 
+let currentEditingQuestionId = null; // ★追加: 現在編集中の問題ID
+
+// ★追加: 画面ブロック用のローディング表示・非表示関数
+function showEditorLoading() {
+    let overlay = document.getElementById('editor-loading-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'editor-loading-overlay';
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#fff; font-size:1.2em; font-weight:bold; cursor:wait;';
+        overlay.innerHTML = '<div class="spinner" style="border-top-color:#fff; margin-bottom:15px; width:50px; height:50px;"></div><div>処理中...</div>';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+}
+
+function hideEditorLoading() {
+    const overlay = document.getElementById('editor-loading-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
 
 // ==========================================
 // ★ 追加: 外部URLを内部サーバーにダウンロードしてURLを置換する処理
@@ -305,9 +324,13 @@ async function saveNewWorkbook() {
 // 問題データの読み込みとリスト生成
 // ==========================================
 async function loadQuestions() {
+    showEditorLoading(); // 読み込み開始時に画面をブロック
+    
+    // 他の初期化処理で変数が消えないように一旦退避
+    const savedEditingId = currentEditingQuestionId; 
+
     const selectEl = document.getElementById('workbook-select');
     currentWorkbookId = selectEl.value;
-    
     const examTab = document.getElementById('tab-exam-setting');
 
     if (!currentWorkbookId) {
@@ -317,14 +340,15 @@ async function loadQuestions() {
         renderCategoryManager();
         if (typeof renderQuestionList === 'function') renderQuestionList();
         if (examTab) examTab.style.display = 'none'; 
+        hideEditorLoading();
         return;
     }
 
     await loadCategories();
-
     const selectedOption = selectEl.options[selectEl.selectedIndex];
     const format = (selectedOption.dataset.format || '').toUpperCase(); 
 
+    // タブの表示切り替え（省略）
     document.getElementById('tab-mcq-edit').style.display = 'none';
     document.getElementById('tab-mcq-manual').style.display = 'none';
     document.getElementById('tab-mcq-paste').style.display = 'none';
@@ -335,44 +359,47 @@ async function loadQuestions() {
     try {
         if (format.includes('SIM') || format === 'SIMULATION') {
             document.getElementById('tab-sim-edit').style.display = 'inline-block';
-            
             const res = await fetch(`${API_BASE_URL}/sim-questions?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() });
-            if (!res.ok) throw new Error(`Status: ${res.status}`);
-            const simData = await res.json();
+            const simData = res.ok ? await res.json() : [];
             currentQuestions = simData.map(q => ({ ...q, type: 'sim' }));
-            
             prepareNewSim(); 
-
         } else {
             document.getElementById('tab-mcq-edit').style.display = 'inline-block';
             document.getElementById('tab-mcq-manual').style.display = 'inline-block';
             document.getElementById('tab-mcq-paste').style.display = 'inline-block';
             document.getElementById('tab-dd-edit').style.display = 'inline-block';
-            
             if (examTab) examTab.style.display = 'inline-block';
             
             const resMcq = await fetch(`${API_BASE_URL}/questions?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() });
             const mcqData = resMcq.ok ? await resMcq.json() : [];
-            
             const resDd = await fetch(`${API_BASE_URL}/dd-questions?workbookId=${currentWorkbookId}`, { headers: getAuthHeaders() });
             const ddData = resDd.ok ? await resDd.json() : [];
             
             const mappedMcq = mcqData.map(q => ({ ...q, type: 'mcq' }));
             const mappedDd = ddData.map(q => ({ ...q, type: 'dd' }));
-            
             currentQuestions = [...mappedMcq, ...mappedDd].sort((a, b) => a.id - b.id);
-            
             prepareNewMcq(); 
         }
 
         if (typeof renderQuestionList === 'function') renderQuestionList(); 
         
+        // ★追加: 読み込み完了後、直前まで操作していた問題があれば自動で開く
+        currentEditingQuestionId = savedEditingId; 
+        if (currentEditingQuestionId) {
+            const targetQ = currentQuestions.find(q => q.id === currentEditingQuestionId);
+            if (targetQ) openEditor(targetQ);
+            else currentEditingQuestionId = null; // 既に存在しない場合はリセット
+        }
+
     } catch (error) {
         console.error('問題読み込みエラー:', error);
-        alert('問題の読み込みに失敗しました。サーバーが起動しているか確認してください。');
+        alert('問題の読み込みに失敗しました。');
+    } finally {
+        hideEditorLoading(); // 処理が終わったらブロック解除
     }
 }
 
+// ★上書き: リスト描画時にハイライト色をつける
 function renderQuestionList() {
     const listEl = document.getElementById('question-list');
     if (!listEl) return;
@@ -386,6 +413,13 @@ function renderQuestionList() {
         div.style.padding = '10px';
         div.style.borderBottom = '1px solid var(--border-color, #e2e8f0)'; 
         div.style.cursor = 'pointer';
+
+        // ★追加: 選択中の問題なら背景色と左線を変更
+        if (q.id === currentEditingQuestionId) {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            div.style.backgroundColor = isDark ? '#1e3a8a' : '#e0f2fe';
+            div.style.borderLeft = '4px solid var(--primary, #3b82f6)';
+        }
 
         let badgeHtml = '';
         if (q.type === 'mcq') badgeHtml = `<span style="background-color: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 8px; font-weight: bold;">四択</span>`;
@@ -427,6 +461,9 @@ function switchTab(tabId) {
 }
 
 function openEditor(q) {
+    currentEditingQuestionId = q.id;
+    renderQuestionList(); // リストの色を更新
+
     if (q.type === 'sim') {
         restoreSimEditor(q);
     } else if (q.type === 'dd') {
@@ -550,8 +587,8 @@ async function uploadImage(fileInput, targetInputId, targetPreviewId) {
 }
 
 async function sendQuestionsToBackend(questionsArray) {
+    showEditorLoading(); // ★追加
     try {
-        // ★ 追加: 保存処理前に外部URLを内部サーバーにダウンロード
         if(typeof showToast === 'function') showToast('画像を内部サーバーに保存しています...');
         questionsArray = await internalizeAllUrls(questionsArray);
         if(typeof showToast === 'function') showToast('問題データを保存しています...');
@@ -566,9 +603,11 @@ async function sendQuestionsToBackend(questionsArray) {
         if(typeof showToast === 'function') showToast('保存に成功しました！');
         else alert('保存に成功しました！');
         
-        loadQuestions();
+        await loadQuestions();
     } catch (error) {
-        alert('保存に失敗しました。バックエンドが起動しているか確認してください。');
+        alert('保存に失敗しました。');
+    } finally {
+        hideEditorLoading(); // ★追加
     }
 }
 
@@ -1259,6 +1298,27 @@ async function saveDdQuestion() {
     } finally {
         const saveBtn = document.querySelector('#dd-edit-mode .btn-primary');
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "保存する"; }
+    }
+}
+
+// ★追加: D&D問題の削除機能
+async function deleteDdQuestion() {
+    const id = document.getElementById('dd-q-id').value;
+    if (!id) return; 
+    
+    if (!confirm(`D&D問題ID: ${id} を削除しますか？`)) return;
+
+    showEditorLoading();
+    try {
+        const response = await fetch(`${API_BASE_URL}/dd-questions/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        if (!response.ok) throw new Error('削除エラー');
+        alert('ドラッグ＆ドロップ問題を削除しました。');
+        currentEditingQuestionId = null; // 削除時は選択状態をリセット
+        await loadQuestions();
+    } catch (error) {
+        alert('削除に失敗しました。');
+    } finally {
+        hideEditorLoading();
     }
 }
 
