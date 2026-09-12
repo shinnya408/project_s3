@@ -1,4 +1,4 @@
-const CACHE_NAME = 'project_s3_v0.000000000000'; // ★バージョンを上げました
+const CACHE_NAME = 'project_s3_v1.0.0'; // バージョン修正
 const urlsToCache = [
   './',
   './exam_filter.html',
