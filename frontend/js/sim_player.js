@@ -112,30 +112,43 @@ function showSimQuestion(index) {
         topoImgContainer.classList.add('hidden');
     }
 
-    // ★修正: initialConfig を解析して複数デバイスを生成
+    // ★ 修正: initialConfig を解析して複数デバイスを生成（Router1を勝手に作らない）
     devices = {};
     if (q.initialConfig) {
         const lines = q.initialConfig.split('\n');
-        let currentDev = 'Router1';
+        
+        const hasDeviceHeader = lines.some(line => line.trim().match(/^\[(.*?)\]$/));
+        let currentDev = hasDeviceHeader ? null : 'Router1';
+        
         lines.forEach(line => {
             const match = line.trim().match(/^\[(.*?)\]$/);
             if (match) currentDev = match[1];
-            if (!devices[currentDev]) devices[currentDev] = new VirtualDevice(currentDev);
+            if (currentDev && !devices[currentDev]) {
+                devices[currentDev] = new VirtualDevice(currentDev);
+            }
         });
         
-        currentDev = 'Router1';
+        if (Object.keys(devices).length === 0) {
+            devices['Router1'] = new VirtualDevice('Router1');
+        }
+
+        currentDev = hasDeviceHeader ? null : 'Router1';
         lines.forEach(line => {
             const trimmed = line.trim();
             const match = trimmed.match(/^\[(.*?)\]$/);
-            if (match) currentDev = match[1];
-            else if (trimmed && !trimmed.startsWith('!')) devices[currentDev].processCommand(trimmed);
+            if (match) {
+                currentDev = match[1];
+            } else if (currentDev && trimmed && !trimmed.startsWith('!')) {
+                devices[currentDev].processCommand(trimmed);
+            }
         });
         Object.values(devices).forEach(d => d.mode = "user");
     } else {
+        // コンフィグが完全に無い場合はRouter1を作る
         devices['Router1'] = new VirtualDevice('Router1');
     }
 
-    // ★追加: 機器切り替えプルダウンの構築
+    // 機器切り替えプルダウンの構築
     const examSelect = document.getElementById('exam-device-select');
     examSelect.innerHTML = '';
     const deviceNames = Object.keys(devices);

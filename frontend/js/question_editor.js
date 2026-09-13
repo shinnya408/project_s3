@@ -1414,22 +1414,36 @@ let editorDevices = {};
 let activeEditorDeviceName = 'Router1';
 let editorDevice = null; 
 
+// ★ 上書き: question_editor.js の resetEditorConsole 関数
+
 function resetEditorConsole() {
     if (typeof VirtualDevice === 'undefined') return;
     
     editorDevices = {};
     const rawConfig = document.getElementById('sim-initial-config').value;
     const lines = rawConfig.split('\n');
-    let currentDev = 'Router1';
+    
+    // ★ 修正: コンフィグ内に [機器名] のヘッダーがあるか判定
+    const hasDeviceHeader = lines.some(line => line.trim().match(/^\[(.*?)\]$/));
+    
+    // ヘッダーがあれば null から開始、なければ互換性のため Router1 から開始
+    let currentDev = hasDeviceHeader ? null : 'Router1';
     
     lines.forEach(line => {
         const trimmed = line.trim();
         const match = trimmed.match(/^\[(.*?)\]$/);
         if (match) currentDev = match[1];
-        if (!editorDevices[currentDev]) editorDevices[currentDev] = new VirtualDevice(currentDev);
+        
+        // currentDev が決まっている場合のみ機器を生成
+        if (currentDev && !editorDevices[currentDev]) {
+            editorDevices[currentDev] = new VirtualDevice(currentDev);
+        }
     });
     
-    if (!editorDevices['Router1']) editorDevices['Router1'] = new VirtualDevice('Router1');
+    // コンフィグが完全に空っぽの場合のみ、デフォルトで Router1 を作成
+    if (Object.keys(editorDevices).length === 0) {
+        editorDevices['Router1'] = new VirtualDevice('Router1');
+    }
     
     // セレクトボックスの更新
     const select = document.getElementById('sim-console-device-select');
@@ -1448,12 +1462,13 @@ function resetEditorConsole() {
     }
 
     // コンフィグの流し込み
-    currentDev = 'Router1';
+    currentDev = hasDeviceHeader ? null : 'Router1';
     lines.forEach(line => {
         const trimmed = line.trim();
         const match = trimmed.match(/^\[(.*?)\]$/);
-        if (match) currentDev = match[1];
-        else if (trimmed && !trimmed.startsWith('!')) {
+        if (match) {
+            currentDev = match[1];
+        } else if (currentDev && trimmed && !trimmed.startsWith('!')) {
             editorDevices[currentDev].processCommand(trimmed);
         }
     });
