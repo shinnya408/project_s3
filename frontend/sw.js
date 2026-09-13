@@ -1,4 +1,4 @@
-const CACHE_NAME = 'project_s3_v1.0.2'; // シミュレーションの仕様変更 機器名を正確に表示
+const CACHE_NAME = 'project_s3_v1.0.3'; // シミュレーションの仕様変更 特定のIDのモードを操作可能にする
 const urlsToCache = [
   './',
   './exam_filter.html',

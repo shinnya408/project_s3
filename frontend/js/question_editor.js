@@ -1560,7 +1560,30 @@ function addSimRuleUI(container, scope = 'Router1::global', condition = '', scor
         deviceName = parts[0];
         actualScope = parts[1];
     } else if (scope) {
-        actualScope = scope; // 互換性のため
+        actualScope = scope; 
+    }
+
+    // 保存されているスコープを「種別」と「ID/名前」に分解する
+    let scopeType = 'global';
+    let scopeArg = '';
+    
+    if (actualScope === 'global') {
+        scopeType = 'global';
+    } else if (actualScope.startsWith('interface vlan ')) {
+        scopeType = 'interface vlan';
+        scopeArg = actualScope.replace('interface vlan ', '');
+    } else if (actualScope.startsWith('interface ')) {
+        scopeType = 'interface';
+        scopeArg = actualScope.replace('interface ', '');
+    } else if (actualScope.startsWith('vlan ')) {
+        scopeType = 'vlan';
+        scopeArg = actualScope.replace('vlan ', '');
+    } else if (actualScope.startsWith('router ospf ')) {
+        scopeType = 'router ospf';
+        scopeArg = actualScope.replace('router ospf ', '');
+    } else {
+        scopeType = 'custom';
+        scopeArg = actualScope;
     }
 
     const ruleDiv = document.createElement('div');
@@ -1568,36 +1591,39 @@ function addSimRuleUI(container, scope = 'Router1::global', condition = '', scor
     ruleDiv.style.borderLeft = '3px solid #0284c7';
     ruleDiv.style.marginBottom = '5px';
     ruleDiv.style.padding = '5px 10px';
-    
-    const scopeOptions = [
-        { val: 'global', label: '🌍 グローバル (global / static等)' },
-        { val: 'interface GigabitEthernet0/0', label: '🔌 IF: GigabitEthernet0/0' },
-        { val: 'interface vlan 10', label: '🌐 仮想IF: VLAN 10' },
-        { val: 'vlan 10', label: '🏢 VLAN設定: 10' },
-        { val: 'router ospf 1', label: '🔄 OSPF: プロセス 1' }
-    ];
-    
-    if (!scopeOptions.find(o => o.val === actualScope)) {
-        scopeOptions.push({ val: actualScope, label: `⚙️ カスタム: ${actualScope}` });
-    }
-
-    let selectHtml = `<input type="text" class="rule-device form-control" value="${deviceName}" placeholder="対象機器" style="width:90px; padding: 4px; font-size: 0.9em;">`;
-    selectHtml += `<select class="rule-scope form-control" style="flex: 1.5; padding: 4px; font-size: 0.9em; min-width: 150px;">`;
-    scopeOptions.forEach(opt => {
-        const selected = (opt.val === actualScope) ? 'selected' : '';
-        selectHtml += `<option value="${opt.val}" ${selected}>${opt.label}</option>`;
-    });
-    selectHtml += `</select>`;
 
     ruleDiv.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; width:100%;">
-            ${selectHtml}
-            <input type="text" class="rule-condition" placeholder="必須設定" value="${condition}" style="flex:2; padding: 4px 8px; font-size: 0.9em; border: 1px solid var(--border-color, #cbd5e1); border-radius: 4px;">
+        <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap: wrap;">
+            <input type="text" class="rule-device form-control" value="${deviceName}" placeholder="対象機器" style="width:90px; padding: 4px; font-size: 0.9em;">
+            
+            <select class="rule-scope-type form-control" style="width: 140px; padding: 4px; font-size: 0.9em;" onchange="toggleScopeArg(this)">
+                <option value="global" ${scopeType === 'global' ? 'selected' : ''}>🌍 グローバル</option>
+                <option value="interface" ${scopeType === 'interface' ? 'selected' : ''}>🔌 IF (物理)</option>
+                <option value="interface vlan" ${scopeType === 'interface vlan' ? 'selected' : ''}>🌐 IF (VLAN)</option>
+                <option value="vlan" ${scopeType === 'vlan' ? 'selected' : ''}>🏢 VLAN作成</option>
+                <option value="router ospf" ${scopeType === 'router ospf' ? 'selected' : ''}>🔄 OSPF</option>
+                <option value="custom" ${scopeType === 'custom' ? 'selected' : ''}>⚙️ カスタム</option>
+            </select>
+            
+            <input type="text" class="rule-scope-arg form-control" value="${scopeArg}" placeholder="ID/名 (例: 10, Gi0/0)" style="width:120px; padding: 4px; font-size: 0.9em; display: ${scopeType === 'global' ? 'none' : 'inline-block'};">
+            
+            <input type="text" class="rule-condition" placeholder="必須設定 (例: no shutdown)" value="${condition}" style="flex:1; min-width: 150px; padding: 4px 8px; font-size: 0.9em; border: 1px solid var(--border-color, #cbd5e1); border-radius: 4px;">
             <input type="number" class="rule-score" placeholder="配点" value="${score}" style="width:70px; padding: 4px 8px; font-size: 0.9em; border: 1px solid var(--border-color, #cbd5e1); border-radius: 4px;" min="0">
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()" style="padding:4px 10px; font-weight:bold;">×</button>
         </div>
     `;
     container.appendChild(ruleDiv);
+}
+
+function toggleScopeArg(selectEl) {
+    const argInput = selectEl.nextElementSibling;
+    if (selectEl.value === 'global') {
+        argInput.style.display = 'none';
+        argInput.value = '';
+    } else {
+        argInput.style.display = 'inline-block';
+        argInput.focus();
+    }
 }
 
 function generateRulesForTask(btn) {
@@ -1644,13 +1670,22 @@ async function saveSimQuestion() {
         const rules = [];
         box.querySelectorAll('.sim-rule-box').forEach((rBox) => {
             const device = rBox.querySelector('.rule-device').value.trim() || 'Router1';
-            const scopeVal = rBox.querySelector('.rule-scope').value.trim();
+            const type = rBox.querySelector('.rule-scope-type').value;
+            const arg = rBox.querySelector('.rule-scope-arg').value.trim();
             const cond = rBox.querySelector('.rule-condition').value.trim();
             const score = parseInt(rBox.querySelector('.rule-score').value) || 0;
-            // ★修正: 機器名とスコープを :: で結合して保存する
+            
+            // ★ 修正: 「種別」と「ID」を結合してスコープを作る
+            let scopeVal = 'global';
+            if (type === 'custom') {
+                scopeVal = arg;
+            } else if (type !== 'global') {
+                scopeVal = `${type} ${arg}`.trim();
+            }
+
             if (scopeVal && cond) rules.push({ scope: `${device}::${scopeVal}`, condition: cond, score });
         });
-
+        
         tasks.push({
             sequence: index + 1,
             instruction: box.querySelector('.task-instruction').value.trim(),
