@@ -1,21 +1,71 @@
 // ==========================================
-// simulator_engine.js (Pro Edition - Full Feature)
+// ネットワーク計算用ヘルパー関数
 // ==========================================
+function ipToUint32(ip) {
+    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+}
 
+function isValidIpAddress(ip) {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    return parts.every(part => {
+        const num = parseInt(part, 10);
+        return num >= 0 && num <= 255 && String(num) === part;
+    });
+}
+
+function isValidSubnetMask(mask) {
+    if (!isValidIpAddress(mask)) return false;
+    const binaryStr = mask.split('.')
+        .map(octet => parseInt(octet, 10).toString(2).padStart(8, '0'))
+        .join('');
+    return /^1*0*$/.test(binaryStr);
+}
+
+function isNetworkAddress(ip, mask) {
+    if (!isValidIpAddress(ip) || !isValidSubnetMask(mask)) return false;
+    const ipNum = ipToUint32(ip);
+    const maskNum = ipToUint32(mask);
+    return ((ipNum & maskNum) >>> 0) === ipNum;
+}
+
+function isBroadcastAddress(ip, mask) {
+    if (!isValidIpAddress(ip) || !isValidSubnetMask(mask)) return false;
+    const ipNum = ipToUint32(ip);
+    const maskNum = ipToUint32(mask);
+    const invertedMask = (~maskNum) >>> 0;
+    const broadcastNum = (ipNum | invertedMask) >>> 0;
+    return (ipNum >>> 0) === broadcastNum;
+}
+
+function isUsableIpAddress(ip) {
+    if (!isValidIpAddress(ip)) return false;
+    const firstOctet = parseInt(ip.split('.')[0], 10);
+    if (firstOctet === 127) return false;
+    if (firstOctet >= 224 && firstOctet <= 239) return false;
+    return true;
+}
+
+// ==========================================
+// VirtualDevice クラス
+// ==========================================
 class VirtualDevice {
     constructor(hostname = "Router") {
         this.hostname = hostname;
-        this.mode = "user"; // user, priv, global, if, router, vlan
-        this.currentInterface = null;
-        this.currentVlan = null;
-        
-        this.runningConfig = {
-            hostname: hostname,
-            interfaces: {},
-            routes: [], 
-            ospf: null, 
-            vlans: {}   
+        this.mode = "user";
+        this.currentScope = "global"; 
+        this.configStore = {
+            "global": { "hostname": `hostname ${hostname}` }
         };
+    }
+
+    setConfig(key, commandString, scope = this.currentScope) {
+        if (!this.configStore[scope]) this.configStore[scope] = {};
+        if (commandString === null) {
+            delete this.configStore[scope][key];
+        } else {
+            this.configStore[scope][key] = commandString;
+        }
     }
 
     getPrompt() {
@@ -44,21 +94,37 @@ class VirtualDevice {
     }
 
     _getTreeForMode() {
-        return { ...commandTree["_common"], ...commandTree[this.mode] };
+        const tree = { ...commandTree["_common"], ...commandTree[this.mode] };
+        if (this.mode === "user") {
+            delete tree["end"];
+        }
+        return tree;
     }
 
-    // ★追加: Tabキー補完ロジック
     getCompletion(input) {
+        const prefixMatch = input.match(/^(\s*no\s+)(.*)/i);
+        if (prefixMatch) {
+            const prefix = prefixMatch[1];
+            const rest = prefixMatch[2];
+            
+            const explicitResult = this._getCompletionCore(input);
+            if (explicitResult !== input) return explicitResult;
+            
+            const autoResult = this._getCompletionCore(rest);
+            if (autoResult !== rest) return prefix + autoResult;
+            return input;
+        }
+        return this._getCompletionCore(input);
+    }
+
+    _getCompletionCore(input) {
         const text = input.trimStart();
         if (!text) return input;
         
         let tokens = text.split(/\s+/);
         const endsWithSpace = input.endsWith(' ');
-        if (endsWithSpace && tokens[tokens.length - 1] === "") {
-            tokens.pop();
-        }
-
-        if (endsWithSpace) return input; // スペースの後は補完しない
+        if (endsWithSpace && tokens[tokens.length - 1] === "") tokens.pop();
+        if (endsWithSpace) return input;
 
         let node = this._getTreeForMode();
         const lastToken = tokens[tokens.length - 1].toLowerCase();
@@ -67,8 +133,7 @@ class VirtualDevice {
             const t = tokens[i].toLowerCase();
             const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(t));
             if (matches.length === 0) return input;
-            const exactMatch = matches.find(k => k.toLowerCase() === t);
-            const matchKey = exactMatch || (matches.length === 1 ? matches[0] : null);
+            const matchKey = matches.find(k => k.toLowerCase() === t) || (matches.length === 1 ? matches[0] : null);
             if (!matchKey || node[matchKey].action) return input;
             node = node[matchKey];
         }
@@ -76,8 +141,7 @@ class VirtualDevice {
         const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(lastToken));
         if (matches.length === 1) {
             tokens[tokens.length - 1] = matches[0];
-            const prefixSpace = input.match(/^\s*/)[0];
-            return prefixSpace + tokens.join(' ') + " ";
+            return input.match(/^\s*/)[0] + tokens.join(' ') + " ";
         } else if (matches.length > 1) {
             let prefix = matches[0];
             for (let i = 1; i < matches.length; i++) {
@@ -88,58 +152,70 @@ class VirtualDevice {
             }
             if (prefix.length > lastToken.length) {
                 tokens[tokens.length - 1] = prefix;
-                const prefixSpace = input.match(/^\s*/)[0];
-                return prefixSpace + tokens.join(' ');
+                return input.match(/^\s*/)[0] + tokens.join(' ');
             }
         }
         return input;
     }
 
-    // ★追加: ?キー ヘルプロジック
     getHelp(input) {
+        const prefixMatch = input.match(/^(\s*no\s+)(.*)/i);
+        if (prefixMatch) {
+            const prefix = prefixMatch[1];
+            const rest = prefixMatch[2];
+            
+            const explicitResult = this._getHelpCore(input);
+            if (explicitResult && !explicitResult.startsWith("% Unrecognized command") && !explicitResult.startsWith("% Ambiguous command")) {
+                return explicitResult;
+            }
+            
+            return this._getHelpCore(rest);
+        }
+        return this._getHelpCore(input);
+    }
+
+    _getHelpCore(input) {
         const text = input.trimStart();
         if (!text && input.length === 0) return this._formatHelp(this._getTreeForMode());
 
         let tokens = text.split(/\s+/);
         const endsWithSpace = input.endsWith(' ');
-        if (endsWithSpace && tokens[tokens.length - 1] === "") {
-            tokens.pop();
-        }
+        if (endsWithSpace && tokens[tokens.length - 1] === "") tokens.pop();
 
         let node = this._getTreeForMode();
         
-        for (let i = 0; i < tokens.length; i++) {
-            const isLast = (i === tokens.length - 1);
+        for (let i = 0; i < tokens.length - 1; i++) {
             const t = tokens[i].toLowerCase();
-            
-            if (isLast && !endsWithSpace) {
-                const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(t));
-                if (matches.length > 0) {
-                    let helpObj = {};
-                    matches.forEach(m => helpObj[m] = node[m]);
-                    return this._formatHelp(helpObj);
-                } else {
-                    return "% Unrecognized command";
-                }
-            }
-            
             const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(t));
             if (matches.length === 0) return "% Unrecognized command";
             
-            const exactMatch = matches.find(k => k.toLowerCase() === t);
-            const matchKey = exactMatch || (matches.length === 1 ? matches[0] : null);
+            const matchKey = matches.find(k => k.toLowerCase() === t) || (matches.length === 1 ? matches[0] : null);
             
             if (!matchKey) return "% Ambiguous command";
-            
-            if (node[matchKey].action) {
-                if (isLast && endsWithSpace) return "  <cr>";
-                return ""; 
-            }
+            if (node[matchKey].action) return endsWithSpace ? "  <cr>" : "";
             node = node[matchKey];
         }
         
-        if (endsWithSpace) return this._formatHelp(node);
-        return "";
+        const lastToken = tokens[tokens.length - 1].toLowerCase();
+        if (!endsWithSpace) {
+            const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(lastToken));
+            if (matches.length > 0) {
+                let helpObj = {};
+                matches.forEach(m => helpObj[m] = node[m]);
+                return this._formatHelp(helpObj);
+            } else {
+                return "% Unrecognized command";
+            }
+        } else {
+            const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(lastToken));
+            const matchKey = matches.find(k => k.toLowerCase() === lastToken) || (matches.length === 1 ? matches[0] : null);
+            
+            if (matchKey && node[matchKey]) {
+                if (node[matchKey].action) return "  <cr>";
+                return this._formatHelp(node[matchKey]);
+            }
+            return "% Unrecognized command";
+        }
     }
 
     _formatHelp(nodeObj) {
@@ -151,19 +227,48 @@ class VirtualDevice {
         return out.trimEnd();
     }
 
+    // ★安全に改修された自動noコマンド・引数バリデーション付き
     processCommand(input) {
         const text = input.trim();
         if (!text) return ""; 
 
         const tokens = text.split(/\s+/);
         const dictionary = this._getTreeForMode();
-        const result = this._resolveCommand(tokens, dictionary);
+        let result = this._resolveCommand(tokens, dictionary);
+        let isAutoNo = false;
 
-        if (result.error) return result.error;
+        if (result.error && tokens.length > 1 && tokens[0].toLowerCase() === "no") {
+            result = this._resolveCommand(tokens.slice(1), dictionary);
+            if (!result.error) {
+                isAutoNo = true; 
+            } else {
+                return "% Unrecognized command";
+            }
+        } else if (result.error) {
+            return result.error;
+        }
+
+        if (result.maxArgs !== undefined && result.args.length > result.maxArgs) {
+            return "% Invalid input detected at '^' marker.";
+        }
 
         try {
-            return result.action(this, result.args);
+            if (isAutoNo) {
+                // 安全なオーバーライド（プロトタイプメソッドを直接呼ぶ）
+                this.setConfig = (key, val, scope = this.currentScope) => {
+                    VirtualDevice.prototype.setConfig.call(this, key, null, scope);
+                };
+            }
+            
+            const output = result.action(this, result.args);
+            
+            if (isAutoNo) {
+                delete this.setConfig; // 確実に元に戻す
+            }
+            return output;
+            
         } catch (e) {
+            if (isAutoNo) delete this.setConfig;
             return "% Error executing command";
         }
     }
@@ -184,7 +289,11 @@ class VirtualDevice {
         const nextNode = node[matches[0]];
 
         if (nextNode.action) {
-            return { action: nextNode.action, args: tokens.slice(1) };
+            return { 
+                action: nextNode.action, 
+                args: tokens.slice(1),
+                maxArgs: nextNode.maxArgs 
+            };
         } else {
             if (tokens.length === 1) return { error: "% Incomplete command." };
             return this._resolveCommand(tokens.slice(1), nextNode);
@@ -193,56 +302,56 @@ class VirtualDevice {
 
     generateRunningConfig() {
         let conf = "!\n";
-        conf += `hostname ${this.runningConfig.hostname}\n!\n`;
         
-        for (const [id, vlanConf] of Object.entries(this.runningConfig.vlans)) {
-            conf += `vlan ${id}\n name ${vlanConf.name}\n!\n`;
+        for (const val of Object.values(this.configStore["global"] || {})) {
+            conf += `${val}\n`;
         }
-
-        for (const [ifName, ifConf] of Object.entries(this.runningConfig.interfaces)) {
-            conf += `interface ${ifName}\n`;
-            if (ifConf.switchportMode) conf += ` switchport mode ${ifConf.switchportMode}\n`;
-            if (ifConf.accessVlan) conf += ` switchport access vlan ${ifConf.accessVlan}\n`;
-            if (ifConf.ip) conf += ` ip address ${ifConf.ip} ${ifConf.subnet}\n`;
-            if (ifConf.shutdown !== false) conf += ` shutdown\n`; 
-            else conf += ` no shutdown\n`;
-            conf += "!\n";
-        }
-
-        if (this.runningConfig.ospf) {
-            conf += `router ospf ${this.runningConfig.ospf.processId}\n`;
-            for (const net of this.runningConfig.ospf.networks) {
-                conf += ` network ${net.network} ${net.wildcard} area ${net.area}\n`;
+        conf += "!\n";
+        
+        for (const [scopeName, settings] of Object.entries(this.configStore)) {
+            if (scopeName === "global") continue;
+            conf += `${scopeName}\n`;
+            for (const val of Object.values(settings)) {
+                conf += ` ${val}\n`; 
             }
             conf += "!\n";
         }
-
-        for (const r of this.runningConfig.routes) {
-            conf += `ip route ${r.network} ${r.mask} ${r.nextHop}\n`;
-        }
-        if (this.runningConfig.routes.length > 0) conf += "!\n";
-
         conf += "end";
         return conf;
     }
 }
 
-// ----------------------------------------------------
-// Ciscoライク コマンド辞書
-// ----------------------------------------------------
+// ==========================================
+// コマンド辞書
+// ==========================================
 const commandTree = {
     "_common": {
+        "no": {},
         "exit": {
+            maxArgs: 0,
             action: (device) => {
-                if (device.mode === "if" || device.mode === "router" || device.mode === "vlan") device.mode = "global";
-                else if (device.mode === "global") device.mode = "priv";
-                else if (device.mode === "priv") device.mode = "user";
+                if (device.mode === "if" || device.mode === "router" || device.mode === "vlan") {
+                    device.mode = "global";
+                    device.currentScope = "global";
+                }
+                else if (device.mode === "global") {
+                    device.mode = "priv";
+                    device.currentScope = "global";
+                }
+                else if (device.mode === "priv") {
+                    device.mode = "user";
+                    device.currentScope = "global";
+                }
                 return "";
             }
         },
         "end": {
+            maxArgs: 0,
             action: (device) => {
-                if (device.mode !== "user") device.mode = "priv";
+                if (device.mode !== "user") {
+                    device.mode = "priv";
+                    device.currentScope = "global";
+                }
                 return "";
             }
         }
@@ -250,30 +359,46 @@ const commandTree = {
     
     "user": {
         "enable": {
+            maxArgs: 0,
             action: (device) => { device.mode = "priv"; return ""; }
         }
     },
     
     "priv": {
         "disable": {
+            maxArgs: 0,
             action: (device) => { device.mode = "user"; return ""; }
         },
         "configure": {
             "terminal": {
-                action: (device) => { device.mode = "global"; return "Enter configuration commands, one per line.  End with CNTL/Z."; }
+                maxArgs: 0,
+                action: (device) => { 
+                    device.mode = "global"; 
+                    device.currentScope = "global";
+                    return "Enter configuration commands, one per line.  End with CNTL/Z."; 
+                }
             }
         },
         "show": {
             "running-config": {
+                maxArgs: 0,
                 action: (device) => device.generateRunningConfig()
             },
             "interfaces": {
+                maxArgs: 0,
                 action: (device) => {
                     let out = "";
-                    for(const [name, conf] of Object.entries(device.runningConfig.interfaces)) {
-                        const status = conf.shutdown !== false ? "administratively down" : "up";
-                        out += `${name} is ${status}, line protocol is ${status}\n`;
-                        if (conf.ip) out += `  Internet address is ${conf.ip}/${conf.subnet}\n`;
+                    for(const [scope, conf] of Object.entries(device.configStore)) {
+                        if (scope.startsWith("interface ")) {
+                            const name = scope.replace("interface ", "");
+                            const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
+                            const status = isDown ? "administratively down" : "up";
+                            out += `${name} is ${status}, line protocol is ${status}\n`;
+                            if (conf["ip_address"]) {
+                                const match = conf["ip_address"].match(/ip address (\S+) (\S+)/);
+                                if (match) out += `  Internet address is ${match[1]}/${match[2]}\n`;
+                            }
+                        }
                     }
                     return out.trim() || "No interfaces configured.";
                 }
@@ -281,30 +406,46 @@ const commandTree = {
             "ip": {
                 "interface": {
                     "brief": {
+                        maxArgs: 0,
                         action: (device) => {
                             let out = "Interface              IP-Address      OK? Method Status                Protocol\n";
-                            for(const [name, conf] of Object.entries(device.runningConfig.interfaces)) {
-                                const ip = conf.ip || "unassigned";
-                                const status = conf.shutdown !== false ? "administratively down" : "up";
-                                const proto = conf.shutdown !== false ? "down" : "up";
-                                out += `${name.padEnd(22)} ${ip.padEnd(15)} YES manual ${status.padEnd(21)} ${proto}\n`;
+                            for(const [scope, conf] of Object.entries(device.configStore)) {
+                                if (scope.startsWith("interface ")) {
+                                    const name = scope.replace("interface ", "");
+                                    let ip = "unassigned";
+                                    if (conf["ip_address"]) {
+                                        const match = conf["ip_address"].match(/ip address (\S+)/);
+                                        if (match) ip = match[1];
+                                    }
+                                    const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
+                                    const status = isDown ? "administratively down" : "up";
+                                    const proto = isDown ? "down" : "up";
+                                    out += `${name.padEnd(22)} ${ip.padEnd(15)} YES manual ${status.padEnd(21)} ${proto}\n`;
+                                }
                             }
                             return out.trim() || "Interface              IP-Address      OK? Method Status                Protocol";
                         }
                     }
                 },
                 "route": {
+                    maxArgs: 0,
                     action: (device) => {
-                        let out = "Codes: L - local, C - connected, S - static, O - OSPF\n\n";
-                        out += "Gateway of last resort is not set\n\n";
-                        
-                        for(const [name, conf] of Object.entries(device.runningConfig.interfaces)) {
-                            if(conf.ip && conf.shutdown === false) {
-                                out += `C    ${conf.ip} is directly connected, ${name}\n`;
+                        let out = "Codes: L - local, C - connected, S - static, O - OSPF\n\nGateway of last resort is not set\n\n";
+                        for(const [scope, conf] of Object.entries(device.configStore)) {
+                            if (scope.startsWith("interface ")) {
+                                const name = scope.replace("interface ", "");
+                                if (conf["ip_address"] && conf["shutdown"] === "no shutdown") {
+                                    const match = conf["ip_address"].match(/ip address (\S+)/);
+                                    if (match) out += `C    ${match[1]} is directly connected, ${name}\n`;
+                                }
                             }
                         }
-                        for(const r of device.runningConfig.routes) {
-                            out += `S    ${r.network} via ${r.nextHop}\n`;
+                        const globals = device.configStore["global"] || {};
+                        for(const [key, val] of Object.entries(globals)) {
+                            if (key.startsWith("route_")) {
+                                const match = val.match(/ip route (\S+) (\S+) (\S+)/);
+                                if (match) out += `S    ${match[1]} via ${match[3]}\n`;
+                            }
                         }
                         return out.trim();
                     }
@@ -315,54 +456,81 @@ const commandTree = {
     
     "global": {
         "hostname": {
+            maxArgs: 1,
             action: (device, args) => {
                 if (args.length === 0) return "% Incomplete command.";
                 device.hostname = args[0];
-                device.runningConfig.hostname = args[0];
+                device.setConfig("hostname", `hostname ${args[0]}`);
                 return "";
             }
         },
         "interface": {
+            maxArgs: 1,
             action: (device, args) => {
                 if (args.length === 0) return "% Incomplete command.";
                 const ifName = device._normalizeInterfaceName(args[0]);
                 device.mode = "if";
-                device.currentInterface = ifName;
-                if (!device.runningConfig.interfaces[ifName]) {
-                    device.runningConfig.interfaces[ifName] = { shutdown: true };
-                }
+                device.currentScope = `interface ${ifName}`;
                 return "";
             }
         },
         "vlan": {
+            maxArgs: 1,
             action: (device, args) => {
                 if (args.length === 0) return "% Incomplete command.";
-                const vlanId = args[0];
                 device.mode = "vlan";
-                device.currentVlan = vlanId;
-                if (!device.runningConfig.vlans[vlanId]) {
-                    device.runningConfig.vlans[vlanId] = { name: `VLAN${vlanId.padStart(4, '0')}` };
-                }
+                device.currentScope = `vlan ${args[0]}`;
                 return "";
             }
         },
         "ip": {
             "route": {
+                maxArgs: 3,
                 action: (device, args) => {
                     if (args.length < 3) return "% Incomplete command.";
-                    device.runningConfig.routes.push({ network: args[0], mask: args[1], nextHop: args[2] });
+                    const [network, mask, nextHop] = args;
+                    if (!isValidIpAddress(network) || !isValidIpAddress(mask) || !isValidIpAddress(nextHop)) {
+                        return "% Invalid IP address or subnet mask.";
+                    }
+                    if (!isValidSubnetMask(mask)) {
+                        return "% Invalid subnet mask.";
+                    }
+                    if (!isNetworkAddress(network, mask)) {
+                        return "% Inconsistent address and mask.";
+                    }
+                    if (!isUsableIpAddress(nextHop)) {
+                        return "% Invalid next hop address.";
+                    }
+                    device.setConfig(`route_${network}_${mask}`, `ip route ${network} ${mask} ${nextHop}`, "global");
                     return "";
                 }
             }
         },
         "router": {
             "ospf": {
+                maxArgs: 1,
                 action: (device, args) => {
                     if (args.length === 0) return "% Incomplete command.";
                     device.mode = "router";
-                    if (!device.runningConfig.ospf) {
-                        device.runningConfig.ospf = { processId: args[0], networks: [] };
-                    }
+                    device.currentScope = `router ospf ${args[0]}`;
+                    return "";
+                }
+            }
+        },
+        "lldp": {
+            "run": {
+                maxArgs: 0,
+                action: (device) => {
+                    device.setConfig("lldp", "lldp run");
+                    return "";
+                }
+            }
+        },
+        "cdp": {
+            "run": {
+                maxArgs: 0,
+                action: (device) => {
+                    device.setConfig("cdp", "cdp run");
                     return "";
                 }
             }
@@ -372,10 +540,18 @@ const commandTree = {
     "if": {
         "ip": {
             "address": {
+                maxArgs: 2,
                 action: (device, args) => {
                     if (args.length < 2) return "% Incomplete command.";
-                    device.runningConfig.interfaces[device.currentInterface].ip = args[0];
-                    device.runningConfig.interfaces[device.currentInterface].subnet = args[1];
+                    const ip = args[0];
+                    const mask = args[1];
+
+                    if (!isValidIpAddress(ip) || !isValidSubnetMask(mask)) return "% Invalid IP address or subnet mask.";
+                    if (isNetworkAddress(ip, mask)) return "Bad mask /" + mask + " for address " + ip;
+                    if (isBroadcastAddress(ip, mask)) return "Bad mask /" + mask + " for address " + ip;
+                    if (!isUsableIpAddress(ip)) return "% Not a valid host address - " + ip;
+
+                    device.setConfig("ip_address", `ip address ${ip} ${mask}`);
                     return "";
                 }
             }
@@ -383,49 +559,86 @@ const commandTree = {
         "switchport": {
             "mode": {
                 "access": {
+                    maxArgs: 0,
                     action: (device) => {
-                        device.runningConfig.interfaces[device.currentInterface].switchportMode = "access";
+                        device.setConfig("switchport_mode", "switchport mode access");
                         return "";
                     }
                 },
                 "trunk": {
+                    maxArgs: 0,
                     action: (device) => {
-                        device.runningConfig.interfaces[device.currentInterface].switchportMode = "trunk";
+                        device.setConfig("switchport_mode", "switchport mode trunk");
                         return "";
                     }
                 }
             },
             "access": {
                 "vlan": {
+                    maxArgs: 1,
                     action: (device, args) => {
                         if (args.length === 0) return "% Incomplete command.";
-                        device.runningConfig.interfaces[device.currentInterface].accessVlan = args[0];
+                        device.setConfig("switchport_access_vlan", `switchport access vlan ${args[0]}`);
                         return "";
                     }
                 }
             }
         },
+        "shutdown": {
+            maxArgs: 0,
+            action: (device) => {
+                device.setConfig("shutdown", `shutdown`);
+                return "";
+            }
+        },
         "no": {
             "shutdown": {
+                maxArgs: 0,
                 action: (device) => {
-                    device.runningConfig.interfaces[device.currentInterface].shutdown = false;
+                    device.setConfig("shutdown", `no shutdown`);
                     return "";
                 }
             }
         },
-        "shutdown": {
-            action: (device) => {
-                device.runningConfig.interfaces[device.currentInterface].shutdown = true;
+        "description": {
+            action: (device, args) => {
+                device.setConfig("description", `description ${args.join(" ")}`);
                 return "";
+            }
+        },
+        "cdp": {
+            "enable": {
+                maxArgs: 0,
+                action: (device) => {
+                    device.setConfig("cdp", "cdp enable");
+                    return "";
+                }
+            }
+        },
+        "lldp": {
+            "transmit": {
+                maxArgs: 0,
+                action: (device) => {
+                    device.setConfig("lldp-transmit", "lldp transmit");
+                    return "";
+                }
+            },
+            "receive": {
+                maxArgs: 0,
+                action: (device) => {
+                    device.setConfig("lldp-receive", "lldp receive");
+                    return "";
+                }
             }
         }
     },
 
     "router": {
         "network": {
+            maxArgs: 4,
             action: (device, args) => {
                 if (args.length < 4 || args[2].toLowerCase() !== "area") return "% Incomplete command.";
-                device.runningConfig.ospf.networks.push({ network: args[0], wildcard: args[1], area: args[3] });
+                device.setConfig(`network_${args[0]}_${args[1]}`, `network ${args[0]} ${args[1]} area ${args[3]}`);
                 return "";
             }
         }
@@ -433,9 +646,10 @@ const commandTree = {
 
     "vlan": {
         "name": {
+            maxArgs: 1,
             action: (device, args) => {
                 if (args.length === 0) return "% Incomplete command.";
-                device.runningConfig.vlans[device.currentVlan].name = args[0];
+                device.setConfig("name", `name ${args[0]}`);
                 return "";
             }
         }

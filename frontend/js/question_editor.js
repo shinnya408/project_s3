@@ -8,6 +8,10 @@ let currentQuestions = [];
 let currentCategories = []; 
 let currentEditingQuestionId = null; // ★追加: 現在編集中の問題ID
 
+// ★ 追加: コマンド履歴を保存するための変数（ファイルの上のほうに定義）
+let commandHistory = [];
+let historyIndex = -1;
+
 // ★追加: 画面ブロック用のローディング表示・非表示関数
 function showEditorLoading() {
     let overlay = document.getElementById('editor-loading-overlay');
@@ -1490,23 +1494,93 @@ function changeEditorDevice() {
     outDiv.scrollTop = outDiv.scrollHeight;
 }
 
+// ==========================================
+// コンソール入力のイベントリスナー (編集画面専用に最適化)
+// ==========================================
 document.getElementById('sim-console-input')?.addEventListener('keydown', function(e) {
+    const currentInput = e.target.value || '';
+
     if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        // 未初期化の場合は初期化
         if (!editorDevice && typeof VirtualDevice !== 'undefined') resetEditorConsole();
-        const cmd = this.value;
+        
+        const cmd = e.target.value;
+        e.target.value = ''; // 入力欄をクリア
+
         const outDiv = document.getElementById('sim-console-output');
+        
+        // 1. プロンプトと入力されたコマンドを印字
         outDiv.innerHTML += `<div><span style="color:#fbbf24;">${editorDevice ? editorDevice.getPrompt() : '>'}</span> ${cmd}</div>`;
         
         if (editorDevice) {
+            // 2. コマンドを実行
             const output = editorDevice.processCommand(cmd);
+            
+            // 3. 結果があれば安全にエンコードして印字
             if (output) {
                 const safeOutput = output.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 outDiv.innerHTML += `<div style="color:#f87171;">${safeOutput}</div>`;
             }
+            
+            // 4. プロンプトの表示を更新
             document.getElementById('sim-console-prompt').textContent = editorDevice.getPrompt();
         }
-        this.value = '';
+        
         outDiv.scrollTop = outDiv.scrollHeight;
+
+        // 5. 履歴に保存
+        if (cmd.trim() !== '') {
+            commandHistory.push(cmd);
+        }
+        historyIndex = commandHistory.length;
+
+    } else if (e.key === 'Tab') {
+        // ★ Tab補完
+        e.preventDefault();
+        if (editorDevice) {
+            e.target.value = editorDevice.getCompletion(currentInput);
+        }
+
+    } else if (e.key === '?') {
+        // ★ ? ヘルプ
+        e.preventDefault();
+        if (editorDevice) {
+            const outDiv = document.getElementById('sim-console-output');
+            
+            // 現在の入力と「?」を印字
+            outDiv.innerHTML += `<div><span style="color:#fbbf24;">${editorDevice.getPrompt()}</span> ${currentInput}?</div>`;
+            
+            // ヘルプテキストを取得して印字
+            const helpText = editorDevice.getHelp(currentInput);
+            if (helpText) {
+                const safeOutput = helpText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                outDiv.innerHTML += `<div style="color:#f87171;">${safeOutput}</div>`;
+            }
+            
+            outDiv.scrollTop = outDiv.scrollHeight;
+            // (入力欄のテキストはそのまま維持されるので続きを打てる)
+        }
+
+    } else if (e.key === 'ArrowUp') {
+        // ★ 履歴 戻る
+        e.preventDefault();
+        if (historyIndex > 0) {
+            historyIndex--;
+            e.target.value = commandHistory[historyIndex];
+        }
+
+    } else if (e.key === 'ArrowDown') {
+        // ★ 履歴 進む
+        e.preventDefault();
+        if (historyIndex < commandHistory.length - 1) {
+            historyIndex++;
+            e.target.value = commandHistory[historyIndex];
+        } else {
+            historyIndex = commandHistory.length;
+            e.target.value = '';
+        }
     }
 });
 
@@ -1626,36 +1700,43 @@ function toggleScopeArg(selectEl) {
     }
 }
 
+// ==========================================
+// ★修正版：コンフィグから採点ルールを全自動抽出する処理
+// ==========================================
 function generateRulesForTask(btn) {
     if (!editorDevice) return alert("まずはコンソールでコマンドを実行してください。");
+    
+    // ルールを追加する対象のコンテナを取得
     const container = btn.closest('div').nextElementSibling; 
-    const conf = editorDevice.runningConfig;
     const devPrefix = activeEditorDeviceName + '::';
     
-    if (conf.hostname && conf.hostname !== 'Router' && conf.hostname !== 'Device' && conf.hostname !== activeEditorDeviceName) {
-        addSimRuleUI(container, `${devPrefix}global`, `hostname ${conf.hostname}`);
-    }
-    
-    if (conf.routes && conf.routes.length > 0) {
-        conf.routes.forEach(r => addSimRuleUI(container, `${devPrefix}global`, `ip route ${r.network} ${r.mask} ${r.nextHop}`));
-    }
-    if (conf.vlans) {
-        for (const [vlanId, vlanConf] of Object.entries(conf.vlans)) {
-            if (vlanConf.name && !vlanConf.name.startsWith('VLAN')) addSimRuleUI(container, `${devPrefix}vlan ${vlanId}`, `name ${vlanConf.name}`);
+    // 現在のデバイスの configStore を展開してすべて抽出
+    const store = editorDevice.configStore;
+    let ruleCount = 0;
+
+    for (const [scopeName, settings] of Object.entries(store)) {
+        // scopeName は "global", "interface GigabitEthernet0/0", "vlan 10" など
+        const ruleScope = `${devPrefix}${scopeName}`;
+
+        for (const [key, commandStr] of Object.entries(settings)) {
+            // 初期状態から存在するデフォルトのホスト名は抽出しない
+            if (scopeName === 'global' && key === 'hostname') {
+                if (commandStr === 'hostname Router' || commandStr === `hostname ${activeEditorDeviceName}`) {
+                    continue;
+                }
+            }
+            
+            // ルールをUIに追加 (スコープ、条件となるコマンド文字列)
+            addSimRuleUI(container, ruleScope, commandStr);
+            ruleCount++;
         }
     }
-    if (conf.ospf) {
-        const ospfScope = `${devPrefix}router ospf ${conf.ospf.processId}`;
-        conf.ospf.networks.forEach(net => addSimRuleUI(container, ospfScope, `network ${net.network} ${net.wildcard} area ${net.area}`));
+    
+    if (ruleCount > 0) {
+        alert(`[${activeEditorDeviceName}] のコンフィグから ${ruleCount} 件のルールを抽出しました！`);
+    } else {
+        alert("抽出できる新しい設定がありません。（※初期状態のままです）");
     }
-    for (const [ifName, ifConf] of Object.entries(conf.interfaces)) {
-        const scope = `${devPrefix}interface ${ifName}`;
-        if (ifConf.ip) addSimRuleUI(container, scope, `ip address ${ifConf.ip} ${ifConf.subnet}`);
-        if (ifConf.shutdown === false) addSimRuleUI(container, scope, 'no shutdown');
-        if (ifConf.switchportMode) addSimRuleUI(container, scope, `switchport mode ${ifConf.switchportMode}`);
-        if (ifConf.accessVlan) addSimRuleUI(container, scope, `switchport access vlan ${ifConf.accessVlan}`);
-    }
-    alert(`[${activeEditorDeviceName}] のコンフィグからルールを抽出しました！`);
 }
 
 async function saveSimQuestion() {

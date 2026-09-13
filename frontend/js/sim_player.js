@@ -17,6 +17,9 @@ let devices = {};
 let activeDevice = null;
 let taskAchievementStatus = {}; 
 
+let commandHistory = [];
+let historyIndex = -1;
+
 document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initTheme === 'function') initTheme();
 
@@ -246,11 +249,20 @@ function setupConsoleInput() {
     const inputEl = document.getElementById('cli-input');
     
     inputEl.addEventListener('keydown', (e) => {
+
+        const currentInput = e.target.value || '';
+
         if (e.key === 'Enter') {
             e.preventDefault();
             const command = inputEl.value;
             inputEl.value = '';
             executeCommand(command);
+
+            // 履歴に保存し、インデックスを最新リセット
+            if (currentInput.trim() !== '') {
+                commandHistory.push(currentInput);
+            }
+            historyIndex = commandHistory.length;
         } else if (e.key === 'Tab') {
             // ★ Tab補完
             e.preventDefault();
@@ -270,6 +282,21 @@ function setupConsoleInput() {
                     appendConsoleOutput(helpText);
                 }
                 // （入力欄の値はそのまま維持されるので、続けて入力可能）
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+                historyIndex--;
+                e.target.value = commandHistory[historyIndex];
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex < commandHistory.length - 1) {
+                historyIndex++;
+                e.target.value = commandHistory[historyIndex];
+            } else {
+                historyIndex = commandHistory.length;
+                e.target.value = '';
             }
         }
     });
@@ -450,84 +477,49 @@ function evaluateRunningConfig() {
 
 function checkRuleCondition(device, scope, conditionStr) {
     if (!device || !device.runningConfig) return false;
-    const conf = device.runningConfig;
 
-    const targetScope = (scope || 'global').toLowerCase().trim();
-    const cond = (conditionStr || '').toLowerCase().trim();
+    const configText = device.generateRunningConfig();
+    if (!configText) return false;
 
-    // ==========================================
-    // 1. グローバル設定の判定
-    // ==========================================
-    if (targetScope === 'global') {
-        if (cond.startsWith('hostname ')) {
-            const expected = cond.replace('hostname ', '').trim();
-            return conf.hostname.toLowerCase() === expected;
+    const lines = configText.split('\n');
+    const normalize = (str) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+    const targetScope = normalize(scope || 'global');
+    const expectedCond = normalize(conditionStr);
+
+    // 【ヘルパー関数】指定した文字列が対象スコープ内に存在するかチェックする
+    const existsInScope = (searchStr) => {
+        if (targetScope === 'global') {
+            return lines.some(line => !line.startsWith(' ') && normalize(line) === searchStr);
         }
-        if (cond.startsWith('ip route ')) {
-            // 例: ip route 192.168.2.0 255.255.255.0 10.0.0.2
-            const parts = cond.replace('ip route ', '').trim().split(/\s+/);
-            if (parts.length < 3) return false;
-            const [net, mask, nextHop] = parts;
-            return conf.routes && conf.routes.some(r => 
-                r.network === net && r.mask === mask && r.nextHop === nextHop
-            );
+
+        let inTargetScope = false;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const normalizedLine = normalize(line);
+
+            if (!inTargetScope && normalizedLine === targetScope) {
+                inTargetScope = true;
+                continue;
+            }
+
+            if (inTargetScope) {
+                if (line === '!' || (!line.startsWith(' ') && line.trim() !== '')) break;
+                if (normalizedLine === searchStr) return true;
+            }
         }
-    } 
-    // ==========================================
-    // 2. インターフェース設定の判定
-    // ==========================================
-    else if (targetScope.startsWith('interface ')) {
-        const rawIfName = targetScope.replace('interface ', '').trim();
-        const expectedIfName = device._normalizeInterfaceName(rawIfName).toLowerCase();
+        return false;
+    };
+
+    // 1. そのままの文字列が存在すれば正解（例: "no shutdown" など明示的に表示される設定）
+    if (existsInScope(expectedCond)) return true;
+
+    // 2. 存在せず、かつ条件が "no " から始まる場合、「否定条件（存在してはいけない）」として評価する
+    if (expectedCond.startsWith('no ')) {
+        const negativeTarget = expectedCond.substring(3).trim(); // 先頭の "no " を取り除く
         
-        const matchedIfKey = Object.keys(conf.interfaces || {}).find(k => k.toLowerCase() === expectedIfName);
-        if (!matchedIfKey) return false;
-
-        const ifConf = conf.interfaces[matchedIfKey];
-
-        if (cond === 'no shutdown') {
-            return ifConf.shutdown === false;
-        } else if (cond.startsWith('ip address ')) {
-            const parts = cond.replace('ip address ', '').trim().split(/\s+/);
-            return (ifConf.ip === parts[0] && (!parts[1] || ifConf.subnet === parts[1]));
-        } else if (cond.startsWith('switchport mode ')) {
-            const mode = cond.replace('switchport mode ', '').trim();
-            return (ifConf.switchportMode && ifConf.switchportMode.toLowerCase() === mode);
-        } else if (cond.startsWith('switchport access vlan ')) {
-            const vlan = cond.replace('switchport access vlan ', '').trim();
-            return (ifConf.accessVlan && String(ifConf.accessVlan) === vlan);
-        }
-    }
-    // ==========================================
-    // 3. VLAN設定の判定
-    // ==========================================
-    else if (targetScope.startsWith('vlan ')) {
-        const vlanId = targetScope.replace('vlan ', '').trim();
-        if (!conf.vlans || !conf.vlans[vlanId]) return false;
-
-        const vlanConf = conf.vlans[vlanId];
-        if (cond.startsWith('name ')) {
-            const expectedName = cond.replace('name ', '').trim();
-            return (vlanConf.name && vlanConf.name.toLowerCase() === expectedName);
-        }
-    }
-    // ==========================================
-    // 4. OSPF設定の判定
-    // ==========================================
-    else if (targetScope.startsWith('router ospf ')) {
-        const processId = targetScope.replace('router ospf ', '').trim();
-        if (!conf.ospf || String(conf.ospf.processId) !== processId) return false;
-
-        if (cond.startsWith('network ')) {
-            // 例: network 192.168.1.0 0.0.0.255 area 0
-            const parts = cond.replace('network ', '').trim().split(/\s+/);
-            if (parts.length < 4 || parts[2] !== 'area') return false;
-            const [net, wildcard, , area] = parts;
-
-            return conf.ospf.networks.some(n => 
-                n.network === net && n.wildcard === wildcard && String(n.area) === area
-            );
-        }
+        // 否定対象（入っていてはいけない設定）が存在しなければ正解、存在してしまったら不正解
+        return !existsInScope(negativeTarget);
     }
 
     return false;
