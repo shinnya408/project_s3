@@ -101,7 +101,6 @@ function showSimQuestion(index) {
     document.getElementById('question-progress-text').innerText = `問 ${index + 1} / ${simQuestions.length}`;
     document.getElementById('btn-prev-q').disabled = (index === 0);
     document.getElementById('btn-next-q').disabled = (index === simQuestions.length - 1);
-
     document.getElementById('scenario-text').innerText = q.question || 'シナリオが設定されていません。';
     
     const topoImgContainer = document.getElementById('topology-image-container');
@@ -113,18 +112,58 @@ function showSimQuestion(index) {
         topoImgContainer.classList.add('hidden');
     }
 
-    activeDevice = new VirtualDevice("Router");
-    devices = { ["Router"]: activeDevice };
-    document.getElementById('cli-device-title').innerText = `Virtual Console (Question ID: ${q.id})`;
-
+    // ★修正: initialConfig を解析して複数デバイスを生成
+    devices = {};
     if (q.initialConfig) {
-        applyInitialConfig(activeDevice, q.initialConfig);
+        const lines = q.initialConfig.split('\n');
+        let currentDev = 'Router1';
+        lines.forEach(line => {
+            const match = line.trim().match(/^\[(.*?)\]$/);
+            if (match) currentDev = match[1];
+            if (!devices[currentDev]) devices[currentDev] = new VirtualDevice(currentDev);
+        });
+        
+        currentDev = 'Router1';
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            const match = trimmed.match(/^\[(.*?)\]$/);
+            if (match) currentDev = match[1];
+            else if (trimmed && !trimmed.startsWith('!')) devices[currentDev].processCommand(trimmed);
+        });
+        Object.values(devices).forEach(d => d.mode = "user");
+    } else {
+        devices['Router1'] = new VirtualDevice('Router1');
     }
+
+    // ★追加: 機器切り替えプルダウンの構築
+    const examSelect = document.getElementById('exam-device-select');
+    examSelect.innerHTML = '';
+    const deviceNames = Object.keys(devices);
+    deviceNames.forEach(devName => {
+        const opt = document.createElement('option');
+        opt.value = devName;
+        opt.textContent = devName;
+        examSelect.appendChild(opt);
+    });
+    
+    if (deviceNames.length > 1) examSelect.classList.remove('hidden');
+    else examSelect.classList.add('hidden');
+
+    activeDevice = devices[deviceNames[0]];
+    document.getElementById('cli-device-title').innerText = `Virtual Console (${activeDevice.hostname})`;
 
     clearConsoleOutput();
     updateCliPrompt();
     renderTasksList(q.tasks || []);
     evaluateRunningConfig();
+}
+
+function changeExamDevice() {
+    const selectedName = document.getElementById('exam-device-select').value;
+    activeDevice = devices[selectedName];
+    document.getElementById('cli-device-title').innerText = `Virtual Console (${selectedName})`;
+    updateCliPrompt();
+    appendConsoleOutput(`\n*** Switched to ${selectedName} ***\n`);
 }
 
 function applyInitialConfig(device, configText) {
@@ -336,7 +375,18 @@ function evaluateRunningConfig() {
             const ruleScore = rule.score || 10;
             taskMaxScore += ruleScore;
             
-            if (checkRuleCondition(activeDevice, rule.scope, rule.condition)) {
+            // ★修正: スコープから対象機器名を取り出して判定する
+            let targetDevName = 'Router1';
+            let targetScope = rule.scope;
+            if (rule.scope.includes('::')) {
+                const parts = rule.scope.split('::');
+                targetDevName = parts[0];
+                targetScope = parts[1];
+            }
+            
+            const targetDevice = devices[targetDevName];
+            
+            if (targetDevice && checkRuleCondition(targetDevice, targetScope, rule.condition)) {
                 taskEarnedScore += ruleScore;
             } else {
                 taskUnmetRules.push({ scope: rule.scope, condition: rule.condition });
@@ -521,8 +571,11 @@ async function submitSimExam() {
     if (!isReadOnlyMode) {
         const q = simQuestions[currentQuestionIndex];
         
-        // エンジンから最終的なコンフィグをプレーンテキストで抽出
-        const finalConfigText = activeDevice.generateRunningConfig();
+        // ★修正: すべてのデバイスのコンフィグを結合して提出テキストにする
+        let finalConfigText = "";
+        Object.keys(devices).forEach(dName => {
+            finalConfigText += `[${dName}]\n` + devices[dName].generateRunningConfig() + "\n\n";
+        });
 
         const payload = [{
             workbookId: parseInt(workbookId),

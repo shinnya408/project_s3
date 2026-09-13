@@ -353,17 +353,21 @@
                 <hr style="margin: 30px 0; border: none; border-top: 1px dashed #ccc;">
 
                 <div class="form-group">
-                    <label style="font-size: 1.1em; color: #a16207;">⚙️ 初期コンフィグ (任意)</label>
+                    <label style="font-size: 1.1em; color: #a16207;">⚙️ 初期コンフィグ (任意・複数台対応)</label>
                     <p style="font-size: 0.85em; color: var(--format-text);">
-                        ※問題開始時点で機器（ルーターやスイッチ）に設定しておきたいコンフィグがあれば入力してください。<br>
-                        <span style="color: #ef4444; font-weight: bold;">【重要】</span> 複数のインターフェース等を連続して設定する場合は間に <code>exit</code> が必要です（保存時に自動補完されます）。
+                        ※機器名（例：<code>[Router1]</code> や <code>[Switch1]</code>）を [ ] で囲んで記述すると、複数の機器を同時に生成できます。<br>
                     </p>
-                    <textarea id="sim-initial-config" rows="6" placeholder="!&#10;hostname Switch1&#10;!&#10;interface GigabitEthernet0/0&#10; switchport mode access&#10; exit&#10;!" style="font-family: monospace; background: var(--bg-color);" onblur="if(typeof resetEditorConsole === 'function') resetEditorConsole()"></textarea>
+                    <textarea id="sim-initial-config" rows="6" placeholder="[Router1]&#10;hostname R1&#10;!&#10;[Switch1]&#10;hostname SW1" style="font-family: monospace; background: var(--bg-color);" onblur="if(typeof resetEditorConsole === 'function') resetEditorConsole()"></textarea>
                 </div>
 
                 <!-- テストコンソール -->
                 <div class="form-group" style="background: #27272a; padding: 15px; border-radius: 8px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                    <label style="font-size: 1.1em; color: #fbbf24;">💻 テストコンソール（動作確認 ＆ ルール抽出用）</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <label style="font-size: 1.1em; color: #fbbf24; margin: 0;">💻 テストコンソール（動作確認 ＆ ルール抽出用）</label>
+                        <select id="sim-console-device-select" class="form-control" style="width: auto; padding: 4px; font-size: 0.9em; background: #3f3f46; color: #fff; border-color: #52525b;" onchange="changeEditorDevice()">
+                            <option value="Router1">Router1</option>
+                        </select>
+                    </div>
                     <div id="sim-console-output" style="height: 150px; overflow-y: auto; color: #e4e4e7; font-family: monospace; margin-bottom: 10px; white-space: pre-wrap; word-break: break-all;"></div>
                     <div style="display: flex; align-items: center;">
                         <span id="sim-console-prompt" style="color: #fbbf24; font-family: monospace; margin-right: 8px;">Router&gt;</span>

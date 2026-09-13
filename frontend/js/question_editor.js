@@ -1333,7 +1333,9 @@ function formatInitialConfig(configText) {
     
     for (let line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('!')) {
+        // ★修正: [DeviceName] の行は無視してそのまま維持する
+        if (!trimmed || trimmed.startsWith('!') || trimmed.match(/^\[(.*?)\]$/)) {
+            if (trimmed.match(/^\[(.*?)\]$/)) currentMode = 'global'; 
             formatted.push(line);
             continue;
         }
@@ -1342,9 +1344,7 @@ function formatInitialConfig(configText) {
         const isModeCommand = lower.startsWith('interface ') || lower.startsWith('vlan ') || lower.startsWith('router ospf ');
         
         if (isModeCommand) {
-            if (currentMode !== 'global') {
-                formatted.push(' exit');
-            }
+            if (currentMode !== 'global') formatted.push(' exit');
             formatted.push(line);
             currentMode = 'sub';
         } else if (lower === 'exit' || lower === 'end') {
@@ -1410,27 +1410,69 @@ function restoreSimEditor(q) {
     if(typeof resetEditorConsole === 'function') resetEditorConsole();
 }
 
-let editorDevice = null;
-function resetEditorConsole() {
-    if (typeof VirtualDevice !== 'undefined') {
-        editorDevice = new VirtualDevice("Device");
-        
-        const initialConfig = document.getElementById('sim-initial-config').value;
-        if (initialConfig.trim()) {
-            const lines = initialConfig.split('\n');
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (trimmed && !trimmed.startsWith('!')) {
-                    editorDevice.processCommand(trimmed);
-                }
-            });
-            editorDevice.mode = "user"; 
-        }
+let editorDevices = {};
+let activeEditorDeviceName = 'Router1';
+let editorDevice = null; 
 
-        document.getElementById('sim-console-output').innerHTML = '';
-        document.getElementById('sim-console-prompt').textContent = editorDevice.getPrompt();
-        document.getElementById('sim-console-input').value = '';
+function resetEditorConsole() {
+    if (typeof VirtualDevice === 'undefined') return;
+    
+    editorDevices = {};
+    const rawConfig = document.getElementById('sim-initial-config').value;
+    const lines = rawConfig.split('\n');
+    let currentDev = 'Router1';
+    
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        const match = trimmed.match(/^\[(.*?)\]$/);
+        if (match) currentDev = match[1];
+        if (!editorDevices[currentDev]) editorDevices[currentDev] = new VirtualDevice(currentDev);
+    });
+    
+    if (!editorDevices['Router1']) editorDevices['Router1'] = new VirtualDevice('Router1');
+    
+    // セレクトボックスの更新
+    const select = document.getElementById('sim-console-device-select');
+    if (select) {
+        const currentVal = select.value;
+        select.innerHTML = '';
+        Object.keys(editorDevices).forEach(devName => {
+            const opt = document.createElement('option');
+            opt.value = devName;
+            opt.textContent = devName;
+            select.appendChild(opt);
+        });
+        if (editorDevices[currentVal]) select.value = currentVal;
+        else select.value = Object.keys(editorDevices)[0];
+        activeEditorDeviceName = select.value;
     }
+
+    // コンフィグの流し込み
+    currentDev = 'Router1';
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        const match = trimmed.match(/^\[(.*?)\]$/);
+        if (match) currentDev = match[1];
+        else if (trimmed && !trimmed.startsWith('!')) {
+            editorDevices[currentDev].processCommand(trimmed);
+        }
+    });
+    
+    Object.values(editorDevices).forEach(d => d.mode = "user");
+    editorDevice = editorDevices[activeEditorDeviceName]; 
+    
+    document.getElementById('sim-console-output').innerHTML = '';
+    document.getElementById('sim-console-prompt').textContent = editorDevice.getPrompt();
+    document.getElementById('sim-console-input').value = '';
+}
+
+function changeEditorDevice() {
+    activeEditorDeviceName = document.getElementById('sim-console-device-select').value;
+    editorDevice = editorDevices[activeEditorDeviceName];
+    document.getElementById('sim-console-prompt').textContent = editorDevice.getPrompt();
+    const outDiv = document.getElementById('sim-console-output');
+    outDiv.innerHTML += `\n<div style="color:#0ea5e9;">*** Switched to ${activeEditorDeviceName} ***</div>\n`;
+    outDiv.scrollTop = outDiv.scrollHeight;
 }
 
 document.getElementById('sim-console-input')?.addEventListener('keydown', function(e) {
@@ -1495,7 +1537,17 @@ function addSimTaskUI(task = null) {
     }
 }
 
-function addSimRuleUI(container, scope = 'global', condition = '', score = 10) {
+function addSimRuleUI(container, scope = 'Router1::global', condition = '', score = 10) {
+    let deviceName = 'Router1';
+    let actualScope = scope;
+    if (scope.includes('::')) {
+        const parts = scope.split('::');
+        deviceName = parts[0];
+        actualScope = parts[1];
+    } else if (scope) {
+        actualScope = scope; // 互換性のため
+    }
+
     const ruleDiv = document.createElement('div');
     ruleDiv.className = 'sim-rule-box option-item';
     ruleDiv.style.borderLeft = '3px solid #0284c7';
@@ -1505,27 +1557,19 @@ function addSimRuleUI(container, scope = 'global', condition = '', score = 10) {
     const scopeOptions = [
         { val: 'global', label: '🌍 グローバル (global / static等)' },
         { val: 'interface GigabitEthernet0/0', label: '🔌 IF: GigabitEthernet0/0' },
-        { val: 'interface GigabitEthernet0/1', label: '🔌 IF: GigabitEthernet0/1' },
-        { val: 'interface GigabitEthernet0/2', label: '🔌 IF: GigabitEthernet0/2' },
-        { val: 'interface FastEthernet0/0', label: '🔌 IF: FastEthernet0/0' },
-        { val: 'interface FastEthernet0/1', label: '🔌 IF: FastEthernet0/1' },
-        { val: 'interface Serial0/0/0', label: '🔌 IF: Serial0/0/0' },
-        { val: 'interface Serial0/0/1', label: '🔌 IF: Serial0/0/1' },
-        { val: 'interface vlan 1', label: '🌐 仮想IF: VLAN 1' },
         { val: 'interface vlan 10', label: '🌐 仮想IF: VLAN 10' },
-        { val: 'interface vlan 20', label: '🌐 仮想IF: VLAN 20' },
-        { val: 'router ospf 1', label: '🔄 OSPF: プロセス 1' },
         { val: 'vlan 10', label: '🏢 VLAN設定: 10' },
-        { val: 'vlan 20', label: '🏢 VLAN設定: 20' }
+        { val: 'router ospf 1', label: '🔄 OSPF: プロセス 1' }
     ];
     
-    if (!scopeOptions.find(o => o.val === scope)) {
-        scopeOptions.push({ val: scope, label: `⚙️ カスタム: ${scope}` });
+    if (!scopeOptions.find(o => o.val === actualScope)) {
+        scopeOptions.push({ val: actualScope, label: `⚙️ カスタム: ${actualScope}` });
     }
 
-    let selectHtml = `<select class="rule-scope form-control" style="flex: 1.5; padding: 4px; font-size: 0.9em; min-width: 200px;">`;
+    let selectHtml = `<input type="text" class="rule-device form-control" value="${deviceName}" placeholder="対象機器" style="width:90px; padding: 4px; font-size: 0.9em;">`;
+    selectHtml += `<select class="rule-scope form-control" style="flex: 1.5; padding: 4px; font-size: 0.9em; min-width: 150px;">`;
     scopeOptions.forEach(opt => {
-        const selected = (opt.val === scope) ? 'selected' : '';
+        const selected = (opt.val === actualScope) ? 'selected' : '';
         selectHtml += `<option value="${opt.val}" ${selected}>${opt.label}</option>`;
     });
     selectHtml += `</select>`;
@@ -1533,7 +1577,7 @@ function addSimRuleUI(container, scope = 'global', condition = '', score = 10) {
     ruleDiv.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px; width:100%;">
             ${selectHtml}
-            <input type="text" class="rule-condition" placeholder="必須設定 (hostname R1, ip route... 等)" value="${condition}" style="flex:2; padding: 4px 8px; font-size: 0.9em; border: 1px solid var(--border-color, #cbd5e1); border-radius: 4px;">
+            <input type="text" class="rule-condition" placeholder="必須設定" value="${condition}" style="flex:2; padding: 4px 8px; font-size: 0.9em; border: 1px solid var(--border-color, #cbd5e1); border-radius: 4px;">
             <input type="number" class="rule-score" placeholder="配点" value="${score}" style="width:70px; padding: 4px 8px; font-size: 0.9em; border: 1px solid var(--border-color, #cbd5e1); border-radius: 4px;" min="0">
             <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()" style="padding:4px 10px; font-weight:bold;">×</button>
         </div>
@@ -1545,46 +1589,37 @@ function generateRulesForTask(btn) {
     if (!editorDevice) return alert("まずはコンソールでコマンドを実行してください。");
     const container = btn.closest('div').nextElementSibling; 
     const conf = editorDevice.runningConfig;
+    const devPrefix = activeEditorDeviceName + '::';
     
-    if (conf.hostname && conf.hostname !== 'Router' && conf.hostname !== 'Device') {
-        addSimRuleUI(container, 'global', `hostname ${conf.hostname}`);
+    if (conf.hostname && conf.hostname !== 'Router' && conf.hostname !== 'Device' && conf.hostname !== activeEditorDeviceName) {
+        addSimRuleUI(container, `${devPrefix}global`, `hostname ${conf.hostname}`);
     }
     
     if (conf.routes && conf.routes.length > 0) {
-        conf.routes.forEach(r => {
-            addSimRuleUI(container, 'global', `ip route ${r.network} ${r.mask} ${r.nextHop}`);
-        });
+        conf.routes.forEach(r => addSimRuleUI(container, `${devPrefix}global`, `ip route ${r.network} ${r.mask} ${r.nextHop}`));
     }
-
     if (conf.vlans) {
         for (const [vlanId, vlanConf] of Object.entries(conf.vlans)) {
-            if (vlanConf.name && !vlanConf.name.startsWith('VLAN')) {
-                addSimRuleUI(container, `vlan ${vlanId}`, `name ${vlanConf.name}`);
-            }
+            if (vlanConf.name && !vlanConf.name.startsWith('VLAN')) addSimRuleUI(container, `${devPrefix}vlan ${vlanId}`, `name ${vlanConf.name}`);
         }
     }
-
     if (conf.ospf) {
-        const ospfScope = `router ospf ${conf.ospf.processId}`;
-        conf.ospf.networks.forEach(net => {
-            addSimRuleUI(container, ospfScope, `network ${net.network} ${net.wildcard} area ${net.area}`);
-        });
+        const ospfScope = `${devPrefix}router ospf ${conf.ospf.processId}`;
+        conf.ospf.networks.forEach(net => addSimRuleUI(container, ospfScope, `network ${net.network} ${net.wildcard} area ${net.area}`));
     }
-
     for (const [ifName, ifConf] of Object.entries(conf.interfaces)) {
-        const scope = `interface ${ifName}`;
+        const scope = `${devPrefix}interface ${ifName}`;
         if (ifConf.ip) addSimRuleUI(container, scope, `ip address ${ifConf.ip} ${ifConf.subnet}`);
         if (ifConf.shutdown === false) addSimRuleUI(container, scope, 'no shutdown');
         if (ifConf.switchportMode) addSimRuleUI(container, scope, `switchport mode ${ifConf.switchportMode}`);
         if (ifConf.accessVlan) addSimRuleUI(container, scope, `switchport access vlan ${ifConf.accessVlan}`);
     }
-    
-    alert('現在のコンフィグからこのタスクにルールを抽出しました！\n（※他のタスクと重複したルールがあれば×ボタンで消してください）');
+    alert(`[${activeEditorDeviceName}] のコンフィグからルールを抽出しました！`);
 }
 
 async function saveSimQuestion() {
+    // 省略されていた上部のチェックはそのまま...
     if (!currentWorkbookId) return alert("問題集を選択してください。");
-
     const rawConfig = document.getElementById('sim-initial-config').value;
     const formattedConfig = formatInitialConfig(rawConfig);
     document.getElementById('sim-initial-config').value = formattedConfig;
@@ -1593,10 +1628,12 @@ async function saveSimQuestion() {
     document.querySelectorAll('.sim-task-box').forEach((box, index) => {
         const rules = [];
         box.querySelectorAll('.sim-rule-box').forEach((rBox) => {
-            const scope = rBox.querySelector('.rule-scope').value.trim();
+            const device = rBox.querySelector('.rule-device').value.trim() || 'Router1';
+            const scopeVal = rBox.querySelector('.rule-scope').value.trim();
             const cond = rBox.querySelector('.rule-condition').value.trim();
             const score = parseInt(rBox.querySelector('.rule-score').value) || 0;
-            if (scope && cond) rules.push({ scope, condition: cond, score });
+            // ★修正: 機器名とスコープを :: で結合して保存する
+            if (scopeVal && cond) rules.push({ scope: `${device}::${scopeVal}`, condition: cond, score });
         });
 
         tasks.push({

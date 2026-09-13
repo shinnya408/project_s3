@@ -95,7 +95,9 @@
                         <span class="cli-dot green"></span>
                         <span id="cli-device-title" class="cli-device-name">Virtual Console</span>
                     </div>
-                    <div class="cli-header-actions">
+                    <!-- ★修正: ここに select タグを追加 -->
+                    <div class="cli-header-actions" style="display: flex; align-items: center; gap: 10px;">
+                        <select id="exam-device-select" class="form-control hidden" onchange="changeExamDevice()" style="padding: 2px 5px; font-size: 0.9em; background: #3f3f46; color: white; border: none;"></select>
                         <button class="cli-action-btn" onclick="clearConsoleOutput()">画面クリア</button>
                     </div>
                 </div>
