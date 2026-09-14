@@ -476,8 +476,10 @@ function evaluateRunningConfig() {
 }
 
 function checkRuleCondition(device, scope, conditionStr) {
-    if (!device || !device.runningConfig) return false;
+    // ★修正: 古い !device.runningConfig のチェックを削除し、純粋にdeviceの存在だけを確認
+    if (!device) return false;
 
+    // 現在の正しいメソッドを使ってコンフィグテキストを生成
     const configText = device.generateRunningConfig();
     if (!configText) return false;
 
@@ -511,14 +513,12 @@ function checkRuleCondition(device, scope, conditionStr) {
         return false;
     };
 
-    // 1. そのままの文字列が存在すれば正解（例: "no shutdown" など明示的に表示される設定）
+    // 1. そのままの文字列が存在すれば正解
     if (existsInScope(expectedCond)) return true;
 
-    // 2. 存在せず、かつ条件が "no " から始まる場合、「否定条件（存在してはいけない）」として評価する
+    // 2. 存在せず、かつ条件が "no " から始まる場合（否定条件の評価）
     if (expectedCond.startsWith('no ')) {
-        const negativeTarget = expectedCond.substring(3).trim(); // 先頭の "no " を取り除く
-        
-        // 否定対象（入っていてはいけない設定）が存在しなければ正解、存在してしまったら不正解
+        const negativeTarget = expectedCond.substring(3).trim();
         return !existsInScope(negativeTarget);
     }
 
