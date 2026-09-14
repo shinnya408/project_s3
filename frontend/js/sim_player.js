@@ -476,18 +476,22 @@ function evaluateRunningConfig() {
 }
 
 function checkRuleCondition(device, scope, conditionStr) {
-    // ★修正: 古い !device.runningConfig のチェックを削除し、純粋にdeviceの存在だけを確認
     if (!device) return false;
 
-    // 現在の正しいメソッドを使ってコンフィグテキストを生成
+    const normalize = (str) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const expectedCond = normalize(conditionStr);
+
+    // ★追加: copy run start の特別判定
+    // ルールに「copy run start」などが設定されている場合は、フラグだけを見て正解にする
+    if (expectedCond === 'copy running-config startup-config' || expectedCond === 'copy run start') {
+        return device.startupConfigSaved === true;
+    }
+
     const configText = device.generateRunningConfig();
     if (!configText) return false;
 
     const lines = configText.split('\n');
-    const normalize = (str) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
-
     const targetScope = normalize(scope || 'global');
-    const expectedCond = normalize(conditionStr);
 
     // 【ヘルパー関数】指定した文字列が対象スコープ内に存在するかチェックする
     const existsInScope = (searchStr) => {

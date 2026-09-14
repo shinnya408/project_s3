@@ -54,6 +54,7 @@ class VirtualDevice {
         this.hostname = hostname;
         this.mode = "user";
         this.currentScope = "global"; 
+        this.startupConfigSaved = false; // ★追加：保存されたかを記憶するフラグ
         this.configStore = {
             "global": { "hostname": `hostname ${hostname}` }
         };
@@ -376,6 +377,17 @@ const commandTree = {
                     device.mode = "global"; 
                     device.currentScope = "global";
                     return "Enter configuration commands, one per line.  End with CNTL/Z."; 
+                }
+            }
+        },
+        "copy": {
+            "running-config": {
+                "startup-config": {
+                    maxArgs: 0,
+                    action: (device) => {
+                        device.startupConfigSaved = true; // 保存フラグをONにする
+                        return "Destination filename [startup-config]? \nBuilding configuration...\n[OK]";
+                    }
                 }
             }
         },
