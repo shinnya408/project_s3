@@ -1835,10 +1835,23 @@ function previewSimQuestion() {
     document.querySelectorAll('.sim-task-box').forEach((box, index) => {
         const rules = [];
         box.querySelectorAll('.sim-rule-box').forEach((rBox) => {
-            const scope = rBox.querySelector('.rule-scope').value.trim();
+            // ★ 修正: 保存処理(saveSimQuestion)と全く同じロジックでスコープとルールを組み立てる
+            const device = rBox.querySelector('.rule-device').value.trim() || 'Router1';
+            const type = rBox.querySelector('.rule-scope-type').value;
+            const arg = rBox.querySelector('.rule-scope-arg').value.trim();
             const cond = rBox.querySelector('.rule-condition').value.trim();
             const score = parseInt(rBox.querySelector('.rule-score').value) || 0;
-            if (scope && cond) rules.push({ scope, condition: cond, score });
+            
+            let scopeVal = 'global';
+            if (type === 'custom') {
+                scopeVal = arg;
+            } else if (type !== 'global') {
+                scopeVal = `${type} ${arg}`.trim();
+            }
+
+            if (scopeVal && cond) {
+                rules.push({ scope: `${device}::${scopeVal}`, condition: cond, score });
+            }
         });
 
         tasks.push({
