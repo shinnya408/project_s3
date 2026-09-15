@@ -40,7 +40,7 @@ if ('serviceWorker' in navigator) {
     });
 
     // 登録処理（対策1のキャッシュバスター付き）
-    const swUrl = `/sw.js?v=${new Date().getTime()}`;
+    const swUrl = `/sw.js?v=1.0.8`;
     navigator.serviceWorker.register(swUrl).then(registration => {
         console.log('ServiceWorker registration successful');
     }).catch(err => {

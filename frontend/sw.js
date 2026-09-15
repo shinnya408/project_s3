@@ -1,4 +1,5 @@
-const CACHE_NAME = 'project_s3_v1.0.8'; // シミュレーションの仕様変更 採点ロジックの修正
+const VERSION = '1.0.9';
+const CACHE_NAME = 'project_s3_v' + VERSION; // シミュレーションの仕様変更 採点ロジックの修正
 const urlsToCache = [
   './',
   './exam_filter.html',
@@ -41,7 +42,7 @@ const urlsToCache = [
   './js/exam_player.js',
   './js/exam_result.js',
   './js/exam_review.js',
-  './js/favorite_filter',
+  './js/favorite_filter.js',
   './js/index.js',
   './js/login.js',
   './js/player_menu.js',
