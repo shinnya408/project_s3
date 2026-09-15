@@ -405,30 +405,23 @@ const commandTree = {
                 maxArgs: 0,
                 action: (device) => device.generateRunningConfig()
             },
-            "interface": {
-                maxArgs: 1,
-                action: (device, args) => {
-                    if (args.length === 0) return "% Incomplete command.";
-                    const ifName = device._normalizeInterfaceName(args[0]);
-                    
-                    // ★追加: 物理インターフェイスかどうかの判定
-                    const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
-                    
-                    if (isPhysical) {
-                        if (!device.isInitialized) {
-                            // 初期コンフィグ流し込み中：機器に存在するポートとして登録する
-                            device.registeredInterfaces.add(ifName);
-                        } else {
-                            // ユーザー入力時：登録されていないポートならエラーを返す
-                            if (!device.registeredInterfaces.has(ifName)) {
-                                return "% Invalid interface type and number";
+            "interfaces": {
+                maxArgs: 0,
+                action: (device) => {
+                    let out = "";
+                    for(const [scope, conf] of Object.entries(device.configStore)) {
+                        if (scope.startsWith("interface ")) {
+                            const name = scope.replace("interface ", "");
+                            const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
+                            const status = isDown ? "administratively down" : "up";
+                            out += `${name} is ${status}, line protocol is ${status}\n`;
+                            if (conf["ip_address"]) {
+                                const match = conf["ip_address"].match(/ip address (\S+) (\S+)/);
+                                if (match) out += `  Internet address is ${match[1]}/${match[2]}\n`;
                             }
                         }
                     }
-                    
-                    device.mode = "if";
-                    device.currentScope = `interface ${ifName}`;
-                    return "";
+                    return out.trim() || "No interfaces configured.";
                 }
             },
             "ip": {
@@ -497,6 +490,19 @@ const commandTree = {
             action: (device, args) => {
                 if (args.length === 0) return "% Incomplete command.";
                 const ifName = device._normalizeInterfaceName(args[0]);
+                
+                const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+                
+                if (isPhysical) {
+                    if (!device.isInitialized) {
+                        device.registeredInterfaces.add(ifName);
+                    } else {
+                        if (!device.registeredInterfaces.has(ifName)) {
+                            return "% Invalid interface type and number";
+                        }
+                    }
+                }
+                
                 device.mode = "if";
                 device.currentScope = `interface ${ifName}`;
                 return "";

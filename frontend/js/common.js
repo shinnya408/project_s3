@@ -28,24 +28,14 @@ function toggleTheme() {
 // Service Worker (PWA) の登録
 // ==========================================
 if ('serviceWorker' in navigator) {
-    let refreshing = false;
-    
-    // SWが新しくなり、コントロールを奪った瞬間（controllerchange）を検知
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-            refreshing = true;
-            // 自動的に画面をリロードして、最新のファイルを読み込ませる
-            window.location.reload();
-        }
-    });
-
-    // 登録処理（対策1のキャッシュバスター付き）
-    const swUrl = `/sw.js?v=1.0.8`;
-    navigator.serviceWorker.register(swUrl).then(registration => {
-        console.log('ServiceWorker registration successful');
-    }).catch(err => {
-        console.log('ServiceWorker registration failed: ', err);
-    });
+    // ★ パラメータ（?v=...）を外し、シンプルなパスに戻す！
+    navigator.serviceWorker.register('./sw.js')
+        .then(registration => {
+            console.log('ServiceWorker registration successful');
+        })
+        .catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+        });
 }
 
 // トースト通知のタイマーを管理する変数

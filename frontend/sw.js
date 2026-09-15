@@ -1,5 +1,4 @@
-const VERSION = '1.0.9';
-const CACHE_NAME = 'project_s3_v' + VERSION; // シミュレーションの仕様変更 採点ロジックの修正
+const CACHE_NAME = 'project_s3_v1.0.10';
 const urlsToCache = [
   './',
   './exam_filter.html',
@@ -55,6 +54,8 @@ const urlsToCache = [
   './js/sim_stats.js',
   './js/simulator_engine.js',
 ];
+
+console.log(`🚀 [Service Worker] Current version: ${CACHE_NAME}`);
 
 // 1. インストール時に静的ファイルをキャッシュ
 self.addEventListener('install', (event) => {
