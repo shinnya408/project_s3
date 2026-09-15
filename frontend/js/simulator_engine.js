@@ -141,14 +141,19 @@ class VirtualDevice {
 
         for (let i = 0; i < tokens.length - 1; i++) {
             const t = tokens[i].toLowerCase();
-            const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(t));
+            const subCmds = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
+            const matches = subCmds.filter(k => k.toLowerCase().startsWith(t));
             if (matches.length === 0) return input;
             const matchKey = matches.find(k => k.toLowerCase() === t) || (matches.length === 1 ? matches[0] : null);
-            if (!matchKey || node[matchKey].action) return input;
+            if (!matchKey) return input;
+            
+            const nextSubCmds = Object.keys(node[matchKey]).filter(k => typeof node[matchKey][k] === 'object' && node[matchKey][k] !== null);
+            if (nextSubCmds.length === 0 && node[matchKey].action) return input;
             node = node[matchKey];
         }
 
-        const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(lastToken));
+        const subCmds = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
+        const matches = subCmds.filter(k => k.toLowerCase().startsWith(lastToken));
         if (matches.length === 1) {
             tokens[tokens.length - 1] = matches[0];
             return input.match(/^\s*/)[0] + tokens.join(' ') + " ";
@@ -178,7 +183,6 @@ class VirtualDevice {
             if (explicitResult && !explicitResult.startsWith("% Unrecognized command") && !explicitResult.startsWith("% Ambiguous command")) {
                 return explicitResult;
             }
-            
             return this._getHelpCore(rest);
         }
         return this._getHelpCore(input);
@@ -196,19 +200,23 @@ class VirtualDevice {
         
         for (let i = 0; i < tokens.length - 1; i++) {
             const t = tokens[i].toLowerCase();
-            const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(t));
+            const subCmds = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
+            const matches = subCmds.filter(k => k.toLowerCase().startsWith(t));
             if (matches.length === 0) return "% Unrecognized command";
             
             const matchKey = matches.find(k => k.toLowerCase() === t) || (matches.length === 1 ? matches[0] : null);
-            
             if (!matchKey) return "% Ambiguous command";
-            if (node[matchKey].action) return endsWithSpace ? "  <cr>" : "";
+            
+            const nextSubCmds = Object.keys(node[matchKey]).filter(k => typeof node[matchKey][k] === 'object' && node[matchKey][k] !== null);
+            if (nextSubCmds.length === 0 && node[matchKey].action) return endsWithSpace ? "  <cr>" : "";
             node = node[matchKey];
         }
         
         const lastToken = tokens[tokens.length - 1].toLowerCase();
+        const subCmds = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
+        
         if (!endsWithSpace) {
-            const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(lastToken));
+            const matches = subCmds.filter(k => k.toLowerCase().startsWith(lastToken));
             if (matches.length > 0) {
                 let helpObj = {};
                 matches.forEach(m => helpObj[m] = node[m]);
@@ -217,11 +225,12 @@ class VirtualDevice {
                 return "% Unrecognized command";
             }
         } else {
-            const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(lastToken));
+            const matches = subCmds.filter(k => k.toLowerCase().startsWith(lastToken));
             const matchKey = matches.find(k => k.toLowerCase() === lastToken) || (matches.length === 1 ? matches[0] : null);
             
             if (matchKey && node[matchKey]) {
-                if (node[matchKey].action) return "  <cr>";
+                const nextSubCmds = Object.keys(node[matchKey]).filter(k => typeof node[matchKey][k] === 'object' && node[matchKey][k] !== null);
+                if (nextSubCmds.length === 0 && node[matchKey].action) return "  <cr>";
                 return this._formatHelp(node[matchKey]);
             }
             return "% Unrecognized command";
@@ -230,7 +239,7 @@ class VirtualDevice {
 
     _formatHelp(nodeObj) {
         let out = "";
-        const keys = Object.keys(nodeObj).sort();
+        const keys = Object.keys(nodeObj).filter(k => typeof nodeObj[k] === 'object' && nodeObj[k] !== null).sort();
         for (const k of keys) {
             out += `  ${k.padEnd(20)} \n`;
         }
@@ -287,7 +296,8 @@ class VirtualDevice {
         if (tokens.length === 0) return { error: "% Incomplete command." };
         const currentToken = tokens[0].toLowerCase();
 
-        const matches = Object.keys(node).filter(k => k.toLowerCase().startsWith(currentToken));
+        const subKeys = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
+        const matches = subKeys.filter(k => k.toLowerCase().startsWith(currentToken));
 
         if (matches.length === 0) return { error: "% Unrecognized command" };
         if (matches.length > 1) {
@@ -318,6 +328,14 @@ class VirtualDevice {
         }
         conf += "!\n";
         
+        // ★追加: 登録済みのインターフェイスは設定が空でも出力する
+        this.registeredInterfaces.forEach(ifName => {
+            const scopeName = `interface ${ifName}`;
+            if (!this.configStore[scopeName]) {
+                this.configStore[scopeName] = {};
+            }
+        });
+
         for (const [scopeName, settings] of Object.entries(this.configStore)) {
             if (scopeName === "global") continue;
             conf += `${scopeName}\n`;
@@ -486,10 +504,13 @@ const commandTree = {
             }
         },
         "interface": {
-            maxArgs: 1,
+            "FastEthernet": {}, "GigabitEthernet": {}, "Ethernet": {}, "Serial": {}, "vlan": {},
+            maxArgs: 2,
             action: (device, args) => {
                 if (args.length === 0) return "% Incomplete command.";
-                const ifName = device._normalizeInterfaceName(args[0]);
+                let rawIfName = args[0];
+                if (args.length === 2) rawIfName += args[1]; // "g" "0/0" を結合
+                const ifName = device._normalizeInterfaceName(rawIfName);
                 
                 const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
                 

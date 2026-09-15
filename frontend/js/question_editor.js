@@ -715,7 +715,12 @@ function addOptionUIToContainer(text = '', isCorrect = false, imageUrl = '') {
 function addOptionUI() { addOptionUIToContainer(); }
 
 function saveQuestion() {
-    if (!currentWorkbookId) return alert("問題集を選択してください。");
+    showEditorLoading(); // ★ 追加: 1行目に差し込む！
+
+    if (!currentWorkbookId) {
+        hideEditorLoading(); // ★エラー時は消す
+        return alert("問題集を選択してください。");
+    }
 
     const questionIdStr = document.getElementById('q-id').value;
     const questionId = questionIdStr ? parseInt(questionIdStr) : null;
@@ -1233,7 +1238,12 @@ function addDummyItemUI(dummyData = null) {
 }
 
 async function saveDdQuestion() { 
-    if (!currentWorkbookId) return alert("問題集を選択してください。");
+    showEditorLoading(); // ★ 追加: 1行目に差し込む！
+
+    if (!currentWorkbookId) {
+        hideEditorLoading(); // ★エラー時は消す
+        return alert("問題集を選択してください。");
+    }
     const questionText = document.getElementById('dd-q-text').value.trim();
     if (!questionText) return alert("問題文を入力してください。");
 
@@ -1750,7 +1760,12 @@ function generateRulesForTask(btn) {
 }
 
 async function saveSimQuestion() {
-    // 省略されていた上部のチェックはそのまま...
+    showEditorLoading(); // ★ 追加: 1行目に差し込む！
+
+    if (!currentWorkbookId) {
+        hideEditorLoading(); // ★エラー時は消す
+        return alert("問題集を選択してください。");
+    }
     if (!currentWorkbookId) return alert("問題集を選択してください。");
     const rawConfig = document.getElementById('sim-initial-config').value;
     const formattedConfig = formatInitialConfig(rawConfig);

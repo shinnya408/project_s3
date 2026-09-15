@@ -505,8 +505,6 @@ function checkRuleCondition(device, scope, conditionStr) {
     const normalize = (str) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
     const expectedCond = normalize(conditionStr);
 
-    // ★追加: copy run start の特別判定
-    // ルールに「copy run start」などが設定されている場合は、フラグだけを見て正解にする
     if (expectedCond === 'copy running-config startup-config' || expectedCond === 'copy run start') {
         return device.startupConfigSaved === true;
     }
@@ -515,7 +513,13 @@ function checkRuleCondition(device, scope, conditionStr) {
     if (!configText) return false;
 
     const lines = configText.split('\n');
-    const targetScope = normalize(scope || 'global');
+    let targetScope = normalize(scope || 'global');
+
+    // ★追加: 採点ルールのスコープも、実機と同じように正規化して判定ズレを防ぐ
+    if (targetScope.startsWith('interface ')) {
+        const ifName = targetScope.replace('interface ', '');
+        targetScope = 'interface ' + device._normalizeInterfaceName(ifName).toLowerCase();
+    }
 
     // 【ヘルパー関数】指定した文字列が対象スコープ内に存在するかチェックする
     const existsInScope = (searchStr) => {

@@ -93,11 +93,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.body.appendChild(loader);
 
     try {
+        console.log("バックエンド起動中...");
         // バックエンドを起こすための通信
         await fetch(`${API_BASE_URL}/workbooks`, { 
             method: 'GET',
             headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
         });
+
+        console.log("バックエンドが起動しました");
 
         // 応答があったら消す
         hideLoader();
