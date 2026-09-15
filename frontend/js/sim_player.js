@@ -517,7 +517,7 @@ function checkRuleCondition(device, scope, conditionStr) {
 
     // ★追加: 採点ルールのスコープも、実機と同じように正規化して判定ズレを防ぐ
     if (targetScope.startsWith('interface ')) {
-        const ifName = targetScope.replace('interface ', '');
+        const ifName = targetScope.replace('interface ', '').replace(/\s+/g, '');
         targetScope = 'interface ' + device._normalizeInterfaceName(ifName).toLowerCase();
     }
 

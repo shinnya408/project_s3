@@ -56,7 +56,6 @@ class VirtualDevice {
         this.currentScope = "global"; 
         this.startupConfigSaved = false; 
         
-        // ★追加: 存在するインターフェイスを記憶するリストと、初期化判定フラグ
         this.registeredInterfaces = new Set();
         this.isInitialized = false; 
         
@@ -88,17 +87,19 @@ class VirtualDevice {
 
     _normalizeInterfaceName(name) {
         if (!name) return "";
-        const lower = name.toLowerCase();
-        if (lower.startsWith('g') && !lower.startsWith('gi')) return name.replace(/^g/i, 'GigabitEthernet');
-        if (lower.startsWith('gi')) return name.replace(/^gi/i, 'GigabitEthernet');
-        if (lower.startsWith('gig')) return name.replace(/^gig/i, 'GigabitEthernet');
-        if (lower.startsWith('f') && !lower.startsWith('fa')) return name.replace(/^f/i, 'FastEthernet');
-        if (lower.startsWith('fa')) return name.replace(/^fa/i, 'FastEthernet');
-        if (lower.startsWith('s') && !lower.startsWith('se')) return name.replace(/^s/i, 'Serial');
-        if (lower.startsWith('se')) return name.replace(/^se/i, 'Serial');
+        // ★修正: プレフィックス(文字)とサフィックス(数字)を安全に分離してバグを防ぐ
+        const match = name.match(/^([a-zA-Z]+)(.*)$/);
+        if (!match) return name;
         
-        if (lower.startsWith('e') && !lower.startsWith('et')) return name.replace(/^e/i, 'Ethernet');
-        if (lower.startsWith('et')) return name.replace(/^et/i, 'Ethernet');
+        const prefix = match[1].toLowerCase();
+        const suffix = match[2];
+        
+        if (prefix.startsWith('g')) return 'GigabitEthernet' + suffix;
+        if (prefix.startsWith('f')) return 'FastEthernet' + suffix;
+        if (prefix.startsWith('s')) return 'Serial' + suffix;
+        if (prefix.startsWith('e')) return 'Ethernet' + suffix;
+        if (prefix.startsWith('vl')) return 'Vlan' + suffix;
+        if (prefix.startsWith('lo')) return 'Loopback' + suffix;
         
         return name;
     }
@@ -154,6 +155,7 @@ class VirtualDevice {
 
         const subCmds = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
         const matches = subCmds.filter(k => k.toLowerCase().startsWith(lastToken));
+        
         if (matches.length === 1) {
             tokens[tokens.length - 1] = matches[0];
             return input.match(/^\s*/)[0] + tokens.join(' ') + " ";
@@ -246,7 +248,6 @@ class VirtualDevice {
         return out.trimEnd();
     }
 
-    // ★安全に改修された自動noコマンド・引数バリデーション付き
     processCommand(input) {
         const text = input.trim();
         if (!text) return ""; 
@@ -273,7 +274,6 @@ class VirtualDevice {
 
         try {
             if (isAutoNo) {
-                // 安全なオーバーライド（プロトタイプメソッドを直接呼ぶ）
                 this.setConfig = (key, val, scope = this.currentScope) => {
                     VirtualDevice.prototype.setConfig.call(this, key, null, scope);
                 };
@@ -281,9 +281,7 @@ class VirtualDevice {
             
             const output = result.action(this, result.args);
             
-            if (isAutoNo) {
-                delete this.setConfig; // 確実に元に戻す
-            }
+            if (isAutoNo) delete this.setConfig;
             return output;
             
         } catch (e) {
@@ -293,31 +291,35 @@ class VirtualDevice {
     }
 
     _resolveCommand(tokens, node) {
-        if (tokens.length === 0) return { error: "% Incomplete command." };
+        if (tokens.length === 0) {
+            if (node.action) return { action: node.action, args: [], maxArgs: node.maxArgs };
+            return { error: "% Incomplete command." };
+        }
         const currentToken = tokens[0].toLowerCase();
 
+        // ★修正: Action等のシステムプロパティを無視し、真のサブコマンドのみを検索対象にする
         const subKeys = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
-        const matches = subKeys.filter(k => k.toLowerCase().startsWith(currentToken));
+        let matches = subKeys.filter(k => k.toLowerCase().startsWith(currentToken));
 
-        if (matches.length === 0) return { error: "% Unrecognized command" };
+        // ★修正: サブコマンドにマッチしない場合、引数（ポート番号等）とみなして現在ノードのActionを実行する
+        if (matches.length === 0) {
+            if (node.action) {
+                return { action: node.action, args: tokens, maxArgs: node.maxArgs };
+            }
+            return { error: "% Unrecognized command" };
+        }
+        
         if (matches.length > 1) {
             const exactMatch = matches.find(k => k.toLowerCase() === currentToken);
-            if (!exactMatch) return { error: "% Ambiguous command: " + currentToken };
+            if (!exactMatch) {
+                if (node.action) return { action: node.action, args: tokens, maxArgs: node.maxArgs };
+                return { error: "% Ambiguous command: " + currentToken };
+            }
             matches[0] = exactMatch;
         }
 
         const nextNode = node[matches[0]];
-
-        if (nextNode.action) {
-            return { 
-                action: nextNode.action, 
-                args: tokens.slice(1),
-                maxArgs: nextNode.maxArgs 
-            };
-        } else {
-            if (tokens.length === 1) return { error: "% Incomplete command." };
-            return this._resolveCommand(tokens.slice(1), nextNode);
-        }
+        return this._resolveCommand(tokens.slice(1), nextNode);
     }
 
     generateRunningConfig() {
@@ -328,17 +330,13 @@ class VirtualDevice {
         }
         conf += "!\n";
         
-        // ★追加: 登録済みのインターフェイスは設定が空でも出力する
-        this.registeredInterfaces.forEach(ifName => {
-            const scopeName = `interface ${ifName}`;
-            if (!this.configStore[scopeName]) {
-                this.configStore[scopeName] = {};
-            }
-        });
+        // ★修正: 設定が空っぽでも、登録された物理インターフェイスは全て出力する
+        const scopesToPrint = new Set(Object.keys(this.configStore).filter(s => s !== "global"));
+        this.registeredInterfaces.forEach(ifName => scopesToPrint.add(`interface ${ifName}`));
 
-        for (const [scopeName, settings] of Object.entries(this.configStore)) {
-            if (scopeName === "global") continue;
+        for (const scopeName of Array.from(scopesToPrint)) {
             conf += `${scopeName}\n`;
+            const settings = this.configStore[scopeName] || {};
             for (const val of Object.values(settings)) {
                 conf += ` ${val}\n`; 
             }
@@ -348,6 +346,73 @@ class VirtualDevice {
         return conf;
     }
 }
+
+// ==========================================
+// 賢いインターフェイス用アクション生成関数
+// ==========================================
+const makeIfAction = (prefix) => (device, args) => {
+    if (args.length === 0 && prefix === "") return "% Incomplete command.";
+    if (args.length === 0 && prefix !== "") return "% Incomplete command."; 
+    
+    let rawIfName = prefix + args.join(""); 
+    const ifName = device._normalizeInterfaceName(rawIfName);
+    const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+    
+    if (isPhysical) {
+        if (!device.isInitialized) {
+            device.registeredInterfaces.add(ifName);
+        } else {
+            if (!device.registeredInterfaces.has(ifName)) {
+                return "% Invalid interface type and number";
+            }
+        }
+    }
+    
+    device.mode = "if";
+    device.currentScope = `interface ${ifName}`;
+    return "";
+};
+
+const makeShowIfAction = (prefix) => (device, args) => {
+    let rawIfName = prefix + args.join("");
+    
+    if (rawIfName === "") {
+        let out = "";
+        const scopesToPrint = new Set(Object.keys(device.configStore).filter(s => s.startsWith("interface ")));
+        device.registeredInterfaces.forEach(ifName => scopesToPrint.add(`interface ${ifName}`));
+        
+        for(const scope of Array.from(scopesToPrint)) {
+            const conf = device.configStore[scope] || {};
+            const name = scope.replace("interface ", "");
+            const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
+            const status = isDown ? "administratively down" : "up";
+            out += `${name} is ${status}, line protocol is ${status}\n`;
+            if (conf["ip_address"]) {
+                const match = conf["ip_address"].match(/ip address (\S+) (\S+)/);
+                if (match) out += `  Internet address is ${match[1]}/${match[2]}\n`;
+            }
+        }
+        return out.trim() || "No interfaces configured.";
+    } else {
+        const ifName = device._normalizeInterfaceName(rawIfName);
+        const scope = `interface ${ifName}`;
+        const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+        
+        if (isPhysical && !device.registeredInterfaces.has(ifName)) {
+            return "% Invalid interface type and number";
+        }
+        
+        const conf = device.configStore[scope] || {};
+        const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
+        const status = isDown ? "administratively down" : "up";
+        let out = `${ifName} is ${status}, line protocol is ${status}\n`;
+        if (conf["ip_address"]) {
+            const match = conf["ip_address"].match(/ip address (\S+) (\S+)/);
+            if (match) out += `  Internet address is ${match[1]}/${match[2]}\n`;
+        }
+        return out.trim();
+    }
+};
 
 // ==========================================
 // コマンド辞書
@@ -412,10 +477,22 @@ const commandTree = {
                 "startup-config": {
                     maxArgs: 0,
                     action: (device) => {
-                        device.startupConfigSaved = true; // 保存フラグをONにする
+                        device.startupConfigSaved = true;
                         return "Destination filename [startup-config]? \nBuilding configuration...\n[OK]";
                     }
                 }
+            }
+        },
+        // ★追加: Pingコマンドの実装（ログ出力付き）
+        "ping": {
+            maxArgs: 1,
+            action: (device, args) => {
+                if (args.length === 0) return "% Incomplete command.";
+                const target = args[0];
+                console.log(`🚀 [Simulator] Ping started to ${target}`);
+                const out = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${target}, timeout is 2 seconds:\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms`;
+                console.log(`✅ [Simulator] Ping finished to ${target}`);
+                return out;
             }
         },
         "show": {
@@ -425,22 +502,17 @@ const commandTree = {
             },
             "interfaces": {
                 maxArgs: 0,
-                action: (device) => {
-                    let out = "";
-                    for(const [scope, conf] of Object.entries(device.configStore)) {
-                        if (scope.startsWith("interface ")) {
-                            const name = scope.replace("interface ", "");
-                            const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
-                            const status = isDown ? "administratively down" : "up";
-                            out += `${name} is ${status}, line protocol is ${status}\n`;
-                            if (conf["ip_address"]) {
-                                const match = conf["ip_address"].match(/ip address (\S+) (\S+)/);
-                                if (match) out += `  Internet address is ${match[1]}/${match[2]}\n`;
-                            }
-                        }
-                    }
-                    return out.trim() || "No interfaces configured.";
-                }
+                action: makeShowIfAction("")
+            },
+            // ★追加: show interface (特定のIFを指定する形)
+            "interface": {
+                "FastEthernet": { maxArgs: 1, action: makeShowIfAction("FastEthernet") },
+                "GigabitEthernet": { maxArgs: 1, action: makeShowIfAction("GigabitEthernet") },
+                "Ethernet": { maxArgs: 1, action: makeShowIfAction("Ethernet") },
+                "Serial": { maxArgs: 1, action: makeShowIfAction("Serial") },
+                "vlan": { maxArgs: 1, action: makeShowIfAction("Vlan") },
+                maxArgs: 2,
+                action: makeShowIfAction("")
             },
             "ip": {
                 "interface": {
@@ -503,31 +575,15 @@ const commandTree = {
                 return "";
             }
         },
+        // ★修正: Tab補完と自由入力を両立させた interface コマンド
         "interface": {
-            "FastEthernet": {}, "GigabitEthernet": {}, "Ethernet": {}, "Serial": {}, "vlan": {},
+            "FastEthernet": { maxArgs: 1, action: makeIfAction("FastEthernet") },
+            "GigabitEthernet": { maxArgs: 1, action: makeIfAction("GigabitEthernet") },
+            "Ethernet": { maxArgs: 1, action: makeIfAction("Ethernet") },
+            "Serial": { maxArgs: 1, action: makeIfAction("Serial") },
+            "vlan": { maxArgs: 1, action: makeIfAction("Vlan") },
             maxArgs: 2,
-            action: (device, args) => {
-                if (args.length === 0) return "% Incomplete command.";
-                let rawIfName = args[0];
-                if (args.length === 2) rawIfName += args[1]; // "g" "0/0" を結合
-                const ifName = device._normalizeInterfaceName(rawIfName);
-                
-                const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
-                
-                if (isPhysical) {
-                    if (!device.isInitialized) {
-                        device.registeredInterfaces.add(ifName);
-                    } else {
-                        if (!device.registeredInterfaces.has(ifName)) {
-                            return "% Invalid interface type and number";
-                        }
-                    }
-                }
-                
-                device.mode = "if";
-                device.currentScope = `interface ${ifName}`;
-                return "";
-            }
+            action: makeIfAction("")
         },
         "vlan": {
             maxArgs: 1,

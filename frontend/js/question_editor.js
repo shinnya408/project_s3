@@ -243,6 +243,8 @@ function moveCategory(btn, direction) {
 async function saveCategories() {
     if (!currentWorkbookId) return alert("問題集を選択してください。");
 
+    showEditorLoading();
+
     const rows = document.querySelectorAll('.category-row');
     const newCategories = [];
     
@@ -269,6 +271,8 @@ async function saveCategories() {
         loadQuestions(); 
     } catch (e) {
         alert('カテゴリの保存に失敗しました。');
+    } finally {
+        hideEditorLoading();
     }
 }
 
@@ -756,6 +760,7 @@ async function deleteQuestion() {
     if (!id) return; 
     
     if (!confirm(`問題ID: ${id} を削除しますか？`)) return;
+    showEditorLoading();
 
     try {
         const response = await fetch(`${API_BASE_URL}/questions/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
@@ -763,9 +768,11 @@ async function deleteQuestion() {
         alert('問題を削除しました。');
         document.getElementById('edit-form').style.display = 'none';
         document.getElementById('edit-title').textContent = '問題を選択してください';
-        loadQuestions();
+        await loadQuestions();
     } catch (error) {
         alert('削除に失敗しました。');
+    } finally {
+        hideEditorLoading();
     }
 }
 
@@ -1238,12 +1245,11 @@ function addDummyItemUI(dummyData = null) {
 }
 
 async function saveDdQuestion() { 
-    showEditorLoading(); // ★ 追加: 1行目に差し込む！
-
     if (!currentWorkbookId) {
-        hideEditorLoading(); // ★エラー時は消す
         return alert("問題集を選択してください。");
     }
+
+    showEditorLoading();
     const questionText = document.getElementById('dd-q-text').value.trim();
     if (!questionText) return alert("問題文を入力してください。");
 
@@ -1306,12 +1312,13 @@ async function saveDdQuestion() {
         if (!response.ok) throw new Error('保存エラー');
         alert('ドラッグ＆ドロップ問題を保存しました！');
         prepareNewDd();
-        loadQuestions();
+        await loadQuestions();
     } catch (error) { 
         alert('D&D問題の保存に失敗しました。'); 
     } finally {
         const saveBtn = document.querySelector('#dd-edit-mode .btn-primary');
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "保存する"; }
+        hideEditorLoading(); // ★ 追加: 最後に確実に解除
     }
 }
 
@@ -1760,12 +1767,10 @@ function generateRulesForTask(btn) {
 }
 
 async function saveSimQuestion() {
-    showEditorLoading(); // ★ 追加: 1行目に差し込む！
-
     if (!currentWorkbookId) {
-        hideEditorLoading(); // ★エラー時は消す
         return alert("問題集を選択してください。");
     }
+    showEditorLoading();
     if (!currentWorkbookId) return alert("問題集を選択してください。");
     const rawConfig = document.getElementById('sim-initial-config').value;
     const formattedConfig = formatInitialConfig(rawConfig);
@@ -1830,11 +1835,14 @@ async function saveSimQuestion() {
         });
         if (!response.ok) throw new Error('保存エラー');
         alert('シミュレーション問題を保存しました！');
-        loadQuestions();
+        await loadQuestions();
         prepareNewSim();
-    } catch (e) { alert('保存に失敗しました。'); } finally {
+    } catch (e) { 
+        alert('保存に失敗しました。'); 
+    } finally {
         const saveBtn = document.getElementById('sim-btn-save');
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "新規問題として保存する"; }
+        hideEditorLoading(); // ★ 追加: 最後に確実に解除
     }
 }
 
@@ -1842,13 +1850,19 @@ async function deleteSimQuestion() {
     const id = document.getElementById('sim-q-id').value;
     if (!id) return; 
     if (!confirm(`シミュレーション問題ID: ${id} を削除しますか？`)) return;
+
+    showEditorLoading();
     try {
         const response = await fetch(`${API_BASE_URL}/sim-questions/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         if (!response.ok) throw new Error('削除エラー');
         alert('シミュレーション問題を削除しました。');
         prepareNewSim();
-        loadQuestions();
-    } catch (error) { alert('削除に失敗しました。'); }
+        await loadQuestions();
+    } catch (error) {
+        alert('削除に失敗しました。');
+    } finally {
+        hideEditorLoading();
+    }
 }
 
 function previewSimQuestion() {

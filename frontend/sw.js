@@ -1,4 +1,4 @@
-const CACHE_NAME = 'project_s3_v1.0.11';
+const CACHE_NAME = 'project_s3_v1.0.12';
 const urlsToCache = [
   './',
   './exam_filter.html',
