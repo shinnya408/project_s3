@@ -135,6 +135,9 @@ function showSimQuestion(index) {
             devices['Router1'] = new VirtualDevice('Router1');
         }
 
+        // ★追加: コンフィグを流し込む前にグローバルモードにする
+        Object.values(devices).forEach(d => { d.mode = "global"; d.currentScope = "global"; });
+
         currentDev = hasDeviceHeader ? null : 'Router1';
         lines.forEach(line => {
             const trimmed = line.trim();
@@ -145,7 +148,9 @@ function showSimQuestion(index) {
                 devices[currentDev].processCommand(trimmed);
             }
         });
-        Object.values(devices).forEach(d => d.mode = "user");
+        
+        // ★修正: 流し込みが終わったらユーザーモードに戻す
+        Object.values(devices).forEach(d => { d.mode = "user"; d.currentScope = "global"; });
     } else {
         // コンフィグが完全に無い場合はRouter1を作る
         devices['Router1'] = new VirtualDevice('Router1');
@@ -461,6 +466,22 @@ function evaluateRunningConfig() {
         }
     });
 
+    let penaltyScore = 0;
+    let unsavedDevices = [];
+    Object.keys(devices).forEach(devName => {
+        // ※ VirtualDevice に追加した startupConfigSaved フラグを確認
+        if (devices[devName].startupConfigSaved !== true) {
+            penaltyScore += 10; // 1台保存忘れるごとに -10点
+            unsavedDevices.push(devName);
+        }
+    });
+
+    // ★追加: 獲得スコアからペナルティを引く (最低0点)
+    grandEarnedScore = Math.max(0, grandEarnedScore - penaltyScore);
+
+    // 提出モーダルで減点理由を表示するためにグローバルに保持
+    window.currentExamPenalty = { score: penaltyScore, devices: unsavedDevices };
+
     const percentage = grandTotalScore > 0 ? Math.round((grandEarnedScore / grandTotalScore) * 100) : 0;
     
     const totalBadge = document.getElementById('total-score-badge');
@@ -557,6 +578,16 @@ async function submitSimExam() {
             });
         }
     });
+
+    // ★追加: 暗黙の減点結果をリストに追加して表示する
+    if (window.currentExamPenalty && window.currentExamPenalty.devices.length > 0) {
+        hasMissing = true;
+        window.currentExamPenalty.devices.forEach(d => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span style="color:#ef4444; font-weight:bold;">[暗黙の減点]</span> ${d} で <code>copy run start</code> が保存されていません (-10点)`;
+            missingList.appendChild(li);
+        });
+    }
 
     if (hasMissing) {
         missingContainer.classList.remove('hidden');

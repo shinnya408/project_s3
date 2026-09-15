@@ -1418,8 +1418,6 @@ let editorDevices = {};
 let activeEditorDeviceName = 'Router1';
 let editorDevice = null; 
 
-// ★ 上書き: question_editor.js の resetEditorConsole 関数
-
 function resetEditorConsole() {
     if (typeof VirtualDevice === 'undefined') return;
     
@@ -1449,9 +1447,13 @@ function resetEditorConsole() {
         editorDevices['Router1'] = new VirtualDevice('Router1');
     }
     
+    // ★追加: コンフィグを流し込む前に、全機器を強制的にグローバルモードにする
+    Object.values(editorDevices).forEach(d => { d.mode = "global"; d.currentScope = "global"; });
+
     // セレクトボックスの更新
     const select = document.getElementById('sim-console-device-select');
     if (select) {
+        // ... (既存のセレクトボックス更新処理そのまま) ...
         const currentVal = select.value;
         select.innerHTML = '';
         Object.keys(editorDevices).forEach(devName => {
@@ -1477,8 +1479,10 @@ function resetEditorConsole() {
         }
     });
     
-    Object.values(editorDevices).forEach(d => d.mode = "user");
-    editorDevice = editorDevices[activeEditorDeviceName]; 
+    // ★追加: 流し込みが終わったら、全機器をユーザーモードに戻す
+    Object.values(editorDevices).forEach(d => { d.mode = "user"; d.currentScope = "global"; });
+    
+    editorDevice = editorDevices[activeEditorDeviceName];
     
     document.getElementById('sim-console-output').innerHTML = '';
     document.getElementById('sim-console-prompt').textContent = editorDevice.getPrompt();
