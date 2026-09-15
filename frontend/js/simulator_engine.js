@@ -54,7 +54,12 @@ class VirtualDevice {
         this.hostname = hostname;
         this.mode = "user";
         this.currentScope = "global"; 
-        this.startupConfigSaved = false; // ★追加：保存されたかを記憶するフラグ
+        this.startupConfigSaved = false; 
+        
+        // ★追加: 存在するインターフェイスを記憶するリストと、初期化判定フラグ
+        this.registeredInterfaces = new Set();
+        this.isInitialized = false; 
+        
         this.configStore = {
             "global": { "hostname": `hostname ${hostname}` }
         };
@@ -91,6 +96,10 @@ class VirtualDevice {
         if (lower.startsWith('fa')) return name.replace(/^fa/i, 'FastEthernet');
         if (lower.startsWith('s') && !lower.startsWith('se')) return name.replace(/^s/i, 'Serial');
         if (lower.startsWith('se')) return name.replace(/^se/i, 'Serial');
+        
+        if (lower.startsWith('e') && !lower.startsWith('et')) return name.replace(/^e/i, 'Ethernet');
+        if (lower.startsWith('et')) return name.replace(/^et/i, 'Ethernet');
+        
         return name;
     }
 
@@ -396,23 +405,30 @@ const commandTree = {
                 maxArgs: 0,
                 action: (device) => device.generateRunningConfig()
             },
-            "interfaces": {
-                maxArgs: 0,
-                action: (device) => {
-                    let out = "";
-                    for(const [scope, conf] of Object.entries(device.configStore)) {
-                        if (scope.startsWith("interface ")) {
-                            const name = scope.replace("interface ", "");
-                            const isDown = conf["shutdown"] === "shutdown" || !conf["shutdown"];
-                            const status = isDown ? "administratively down" : "up";
-                            out += `${name} is ${status}, line protocol is ${status}\n`;
-                            if (conf["ip_address"]) {
-                                const match = conf["ip_address"].match(/ip address (\S+) (\S+)/);
-                                if (match) out += `  Internet address is ${match[1]}/${match[2]}\n`;
+            "interface": {
+                maxArgs: 1,
+                action: (device, args) => {
+                    if (args.length === 0) return "% Incomplete command.";
+                    const ifName = device._normalizeInterfaceName(args[0]);
+                    
+                    // ★追加: 物理インターフェイスかどうかの判定
+                    const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+                    
+                    if (isPhysical) {
+                        if (!device.isInitialized) {
+                            // 初期コンフィグ流し込み中：機器に存在するポートとして登録する
+                            device.registeredInterfaces.add(ifName);
+                        } else {
+                            // ユーザー入力時：登録されていないポートならエラーを返す
+                            if (!device.registeredInterfaces.has(ifName)) {
+                                return "% Invalid interface type and number";
                             }
                         }
                     }
-                    return out.trim() || "No interfaces configured.";
+                    
+                    device.mode = "if";
+                    device.currentScope = `interface ${ifName}`;
+                    return "";
                 }
             },
             "ip": {

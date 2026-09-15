@@ -1447,8 +1447,11 @@ function resetEditorConsole() {
         editorDevices['Router1'] = new VirtualDevice('Router1');
     }
     
-    // ★追加: コンフィグを流し込む前に、全機器を強制的にグローバルモードにする
-    Object.values(editorDevices).forEach(d => { d.mode = "global"; d.currentScope = "global"; });
+    Object.values(editorDevices).forEach(d => { 
+        d.mode = "user"; 
+        d.currentScope = "global"; 
+        d.isInitialized = true; // ★追加: 初期化完了フラグを立てる
+    });
 
     // セレクトボックスの更新
     const select = document.getElementById('sim-console-device-select');

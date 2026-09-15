@@ -149,8 +149,11 @@ function showSimQuestion(index) {
             }
         });
         
-        // ★修正: 流し込みが終わったらユーザーモードに戻す
-        Object.values(devices).forEach(d => { d.mode = "user"; d.currentScope = "global"; });
+        Object.values(devices).forEach(d => { 
+            d.mode = "user"; 
+            d.currentScope = "global"; 
+            d.isInitialized = true; // ★追加: 初期化完了フラグを立てる
+        });
     } else {
         // コンフィグが完全に無い場合はRouter1を作る
         devices['Router1'] = new VirtualDevice('Router1');
