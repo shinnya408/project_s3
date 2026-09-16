@@ -167,7 +167,6 @@ class VirtualDevice {
                             return "% Invalid interface range"; 
                         }
                     } else {
-                        // 論理インターフェイスは作成可能
                         this.registeredInterfaces.add(ifName);
                     }
                     resultScopes.push(`interface ${ifName}`);
@@ -220,6 +219,16 @@ class VirtualDevice {
     _getCompletionCore(input) {
         const text = input.trimStart();
         if (!text) return input;
+        
+        // ★追加: 変数(IP等)の後に続く「area」のTab補完を動的に割り込ませる
+        if (this.mode === "router") {
+            const match = input.match(/^(\s*network\s+\S+\s+\S+\s+)(a[a-z]*)$/i);
+            if (match && "area".startsWith(match[2].toLowerCase())) return match[1] + "area ";
+        }
+        if (this.mode === "if") {
+            const match = input.match(/^(\s*ip\s+ospf\s+\d+\s+)(a[a-z]*)$/i);
+            if (match && "area".startsWith(match[2].toLowerCase())) return match[1] + "area ";
+        }
         
         let tokens = text.split(/\s+/);
         const endsWithSpace = input.endsWith(' ');
@@ -282,6 +291,24 @@ class VirtualDevice {
     _getHelpCore(input) {
         const text = input.trimStart();
         if (!text && input.length === 0) return this._formatHelp(this._getTreeForMode());
+
+        // ★追加: 変数(IP等)の後に続く「area」の「?」ヘルプを動的に割り込ませる
+        if (this.mode === "router") {
+            const match = input.match(/^\s*network\s+\S+\s+\S+\s+([a-z]*)$/i);
+            if (match) {
+                const t = match[1].toLowerCase();
+                if (!t || "area".startsWith(t)) return "  area  Set the OSPF area ID";
+                return "% Unrecognized command";
+            }
+        }
+        if (this.mode === "if") {
+            const match = input.match(/^\s*ip\s+ospf\s+\d+\s+([a-z]*)$/i);
+            if (match) {
+                const t = match[1].toLowerCase();
+                if (!t || "area".startsWith(t)) return "  area  Set the OSPF area ID";
+                return "% Unrecognized command";
+            }
+        }
 
         let tokens = text.split(/\s+/);
         const endsWithSpace = input.endsWith(' ');
@@ -368,7 +395,6 @@ class VirtualDevice {
                 };
             }
             
-            // ★修正: isAutoNo フラグを action に渡し、完全削除などを制御させる
             const output = result.action(this, result.args, isAutoNo);
             
             if (isAutoNo) delete this.setConfig;
@@ -437,7 +463,6 @@ class VirtualDevice {
 // ==========================================
 // 賢いインターフェイス用アクション生成関数
 // ==========================================
-// ★修正: isAutoNo を受け取り、論理IFの完全削除などに対応
 const makeIfAction = (prefix) => (device, args, isAutoNo) => {
     if (args.length === 0 && prefix === "") return "% Incomplete command.";
     if (args.length === 0 && prefix !== "") return "% Incomplete command."; 
@@ -460,7 +485,6 @@ const makeIfAction = (prefix) => (device, args, isAutoNo) => {
             }
         }
     } else {
-        // 論理IFは常に作成登録する
         device.registeredInterfaces.add(ifName);
     }
 
@@ -504,7 +528,8 @@ const makeShowIfAction = (prefix) => (device, args) => {
         }
 
         const scope = `interface ${ifName}`;
-        // 物理・論理に関わらず、未作成（未登録）のインターフェイスの show は弾く
+        
+        // ★修正: 物理・論理に関わらず、未作成（未登録）のインターフェイスの show は弾く
         if (!device.registeredInterfaces.has(ifName)) {
             return "% Invalid interface type and number";
         }
@@ -744,7 +769,6 @@ const commandTree = {
         },
         "interface": {
             "range": {
-                // ★修正: rangeでの完全削除対応
                 action: (device, args, isAutoNo) => {
                     if (args.length === 0) return "% Incomplete command.";
                     const scopes = device._parseInterfaceRangeArgs(args);
@@ -779,7 +803,6 @@ const commandTree = {
         },
         "vlan": {
             maxArgs: 1,
-            // ★修正: isAutoNo によるVLANブロックの完全削除対応
             action: (device, args, isAutoNo) => {
                 if (args.length === 0) return "% Incomplete command.";
                 if (isAutoNo) {
@@ -817,7 +840,6 @@ const commandTree = {
         "router": {
             "ospf": {
                 maxArgs: 1,
-                // ★修正: isAutoNo によるOSPFプロセスの完全削除対応
                 action: (device, args, isAutoNo) => {
                     if (args.length === 0) return "% Incomplete command.";
                     if (isAutoNo) {
@@ -881,7 +903,6 @@ const commandTree = {
                     return "";
                 }
             },
-            // ★修正: ospf 周りのヘルプ表示を正しく見せるための分割配置
             "ospf": {
                 "cost": {
                     maxArgs: 1,
@@ -901,7 +922,8 @@ const commandTree = {
                 },
                 action: (device, args) => {
                     if (args.length === 0) return "% Incomplete command.";
-                    if (args.length >= 3 && args[1].toLowerCase() === "area") {
+                    // ★追加: 実行時にも省略形を許容する
+                    if (args.length >= 3 && "area".startsWith(args[1].toLowerCase())) {
                         device.setConfig("ip_ospf_area", `ip ospf ${args[0]} area ${args[2]}`);
                         return "";
                     }
@@ -999,7 +1021,8 @@ const commandTree = {
         "network": {
             maxArgs: 4,
             action: (device, args) => {
-                if (args.length < 4 || args[2].toLowerCase() !== "area") return "% Incomplete command.";
+                // ★追加: 実行時にも省略形を許容し、正規化して保存
+                if (args.length < 4 || !"area".startsWith(args[2].toLowerCase())) return "% Incomplete command.";
                 device.setConfig(`network_${args[0]}_${args[1]}`, `network ${args[0]} ${args[1]} area ${args[3]}`);
                 return "";
             }
