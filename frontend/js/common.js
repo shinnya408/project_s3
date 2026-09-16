@@ -102,11 +102,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         console.log("バックエンドが起動しました");
 
-        // 応答があったら消す
-        hideLoader();
     } catch (error) {
         console.error("サーバー起動チェックエラー:", error);
-        hideLoader(); // エラー時も一生止まらないように消す
+    } finally {
+        hideLoader();
     }
 
     function hideLoader() {

@@ -106,18 +106,17 @@ class VirtualDevice {
         const prefix = match[1].toLowerCase();
         const suffix = match[2];
         
-        // ★修正: 厳密なプレフィックス判定
         if (/^g$|^gi$|^gig$|^gigabitethernet$/i.test(prefix)) return 'GigabitEthernet' + suffix;
         if (/^f$|^fa$|^fastethernet$/i.test(prefix)) return 'FastEthernet' + suffix;
         if (/^s$|^se$|^serial$/i.test(prefix)) return 'Serial' + suffix;
         if (/^e$|^et$|^eth$|^ethernet$/i.test(prefix)) return 'Ethernet' + suffix;
         if (/^vl$|^vlan$/i.test(prefix)) return 'Vlan' + suffix;
         if (/^lo$|^loopback$/i.test(prefix)) return 'Loopback' + suffix;
+        if (/^po$|^port-channel$/i.test(prefix)) return 'Port-channel' + suffix; 
         
         return name;
     }
 
-    // ★修正: 存在しないポートは厳密にエラーにし、後半の英字にも対応するパーサー
     _parseInterfaceRangeArgs(args) {
         const fullStr = args.join(""); 
         const parts = fullStr.split(",");
@@ -157,7 +156,7 @@ class VirtualDevice {
                     const rawIfName = prefix + middle + i;
                     const ifName = this._normalizeInterfaceName(rawIfName);
                     
-                    const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+                    const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback|Port-channel)/i;
                     if (!validTypes.test(ifName)) return "% Invalid interface range";
                     
                     const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
@@ -167,12 +166,15 @@ class VirtualDevice {
                         } else if (!this.registeredInterfaces.has(ifName)) {
                             return "% Invalid interface range"; 
                         }
+                    } else {
+                        // 論理インターフェイスは作成可能
+                        this.registeredInterfaces.add(ifName);
                     }
                     resultScopes.push(`interface ${ifName}`);
                 }
             } else {
                 const ifName = this._normalizeInterfaceName(part);
-                const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+                const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback|Port-channel)/i;
                 if (!validTypes.test(ifName)) return "% Invalid interface range";
 
                 const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
@@ -182,6 +184,8 @@ class VirtualDevice {
                     } else if (!this.registeredInterfaces.has(ifName)) {
                         return "% Invalid interface range";
                     }
+                } else {
+                    this.registeredInterfaces.add(ifName);
                 }
                 resultScopes.push(`interface ${ifName}`);
             }
@@ -364,7 +368,8 @@ class VirtualDevice {
                 };
             }
             
-            const output = result.action(this, result.args);
+            // ★修正: isAutoNo フラグを action に渡し、完全削除などを制御させる
+            const output = result.action(this, result.args, isAutoNo);
             
             if (isAutoNo) delete this.setConfig;
             return output;
@@ -432,14 +437,15 @@ class VirtualDevice {
 // ==========================================
 // 賢いインターフェイス用アクション生成関数
 // ==========================================
-const makeIfAction = (prefix) => (device, args) => {
+// ★修正: isAutoNo を受け取り、論理IFの完全削除などに対応
+const makeIfAction = (prefix) => (device, args, isAutoNo) => {
     if (args.length === 0 && prefix === "") return "% Incomplete command.";
     if (args.length === 0 && prefix !== "") return "% Incomplete command."; 
     
     let rawIfName = prefix + args.join(""); 
     const ifName = device._normalizeInterfaceName(rawIfName);
     
-    const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+    const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback|Port-channel)/i;
     if (!validTypes.test(ifName)) {
         return "% Invalid interface type and number";
     }
@@ -453,6 +459,15 @@ const makeIfAction = (prefix) => (device, args) => {
                 return "% Invalid interface type and number";
             }
         }
+    } else {
+        // 論理IFは常に作成登録する
+        device.registeredInterfaces.add(ifName);
+    }
+
+    if (isAutoNo) {
+        delete device.configStore[`interface ${ifName}`];
+        if (!isPhysical) device.registeredInterfaces.delete(ifName);
+        return "";
     }
     
     device.mode = "if";
@@ -483,15 +498,14 @@ const makeShowIfAction = (prefix) => (device, args) => {
     } else {
         const ifName = device._normalizeInterfaceName(rawIfName);
         
-        const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+        const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback|Port-channel)/i;
         if (!validTypes.test(ifName)) {
             return "% Invalid interface type and number";
         }
 
         const scope = `interface ${ifName}`;
-        const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
-        
-        if (isPhysical && !device.registeredInterfaces.has(ifName)) {
+        // 物理・論理に関わらず、未作成（未登録）のインターフェイスの show は弾く
+        if (!device.registeredInterfaces.has(ifName)) {
             return "% Invalid interface type and number";
         }
         
@@ -592,6 +606,54 @@ const commandTree = {
                 maxArgs: 0,
                 action: (device) => device.generateRunningConfig()
             },
+            "etherchannel": {
+                "summary": {
+                    maxArgs: 0,
+                    action: (device) => {
+                        let out = "Flags:  D - down        P - bundled in port-channel\n        I - stand-alone s - suspended\n        H - Hot-standby (IPv4 only)\n        R - Layer3      S - Layer2\n        U - in use      f - failed to allocate aggregator\n\n        M - not in use, minimum links not met\n        u - unsuitable for bundling\n        w - waiting to be aggregated\n        d - default port\n";
+                        
+                        const groups = {};
+                        for (const [scope, conf] of Object.entries(device.configStore)) {
+                            if (scope.startsWith("interface ")) {
+                                const ifName = scope.replace("interface ", "");
+                                if (conf["channel_group"]) {
+                                    const match = conf["channel_group"].match(/channel-group (\d+) mode (\S+)/);
+                                    if (match) {
+                                        const grp = match[1];
+                                        const mode = match[2];
+                                        if (!groups[grp]) groups[grp] = [];
+                                        groups[grp].push({ifName, mode});
+                                    }
+                                }
+                            }
+                        }
+
+                        const groupKeys = Object.keys(groups);
+                        if (groupKeys.length === 0) {
+                            return out + "\nNumber of channel-groups in use: 0\nNumber of aggregators:           0\n\nNo EtherChannel configured.";
+                        }
+
+                        out += `\nNumber of channel-groups in use: ${groupKeys.length}\nNumber of aggregators:           ${groupKeys.length}\n\nGroup  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------`;
+                        
+                        for (const grp of groupKeys.sort((a,b) => a - b)) {
+                            const poName = `Po${grp}(SU)`;
+                            
+                            let protocol = "-";
+                            const firstMode = groups[grp][0].mode;
+                            if (['active', 'passive'].includes(firstMode)) protocol = "LACP";
+                            else if (['desirable', 'auto'].includes(firstMode)) protocol = "PAgP";
+
+                            const ports = groups[grp].map(p => {
+                                const shortName = p.ifName.replace(/Ethernet/i, 'E').replace(/FastEthernet/i, 'Fa').replace(/GigabitEthernet/i, 'Gi');
+                                return `${shortName}(P)`;
+                            }).join(" ");
+
+                            out += `\n${grp.padEnd(6)} ${poName.padEnd(13)} ${protocol.padEnd(11)} ${ports}`;
+                        }
+                        return out;
+                    }
+                }
+            },
             "interfaces": {
                 maxArgs: 0,
                 action: makeShowIfAction("")
@@ -602,6 +664,7 @@ const commandTree = {
                 "Ethernet": { maxArgs: 1, action: makeShowIfAction("Ethernet") },
                 "Serial": { maxArgs: 1, action: makeShowIfAction("Serial") },
                 "vlan": { maxArgs: 1, action: makeShowIfAction("Vlan") },
+                "Port-channel": { maxArgs: 1, action: makeShowIfAction("Port-channel") },
                 maxArgs: 2,
                 action: makeShowIfAction("")
             },
@@ -626,6 +689,19 @@ const commandTree = {
                                 }
                             }
                             return out.trim() || "Interface              IP-Address      OK? Method Status                Protocol";
+                        }
+                    }
+                },
+                "ospf": {
+                    "neighbor": {
+                        maxArgs: 0,
+                        action: (device) => {
+                            let hasOspf = false;
+                            for (const [scope, conf] of Object.entries(device.configStore)) {
+                                if (scope.startsWith("router ospf")) hasOspf = true;
+                            }
+                            if (!hasOspf) return "";
+                            return "Neighbor ID     Pri   State           Dead Time   Address         Interface\n192.168.1.2       1   FULL/BDR        00:00:34    10.0.0.2        GigabitEthernet0/1";
                         }
                     }
                 },
@@ -668,7 +744,8 @@ const commandTree = {
         },
         "interface": {
             "range": {
-                action: (device, args) => {
+                // ★修正: rangeでの完全削除対応
+                action: (device, args, isAutoNo) => {
                     if (args.length === 0) return "% Incomplete command.";
                     const scopes = device._parseInterfaceRangeArgs(args);
                     if (typeof scopes === 'string') {
@@ -676,6 +753,15 @@ const commandTree = {
                     }
                     if (scopes.length === 0) {
                         return "% Invalid interface range";
+                    }
+                    if (isAutoNo) {
+                        scopes.forEach(scope => {
+                            delete device.configStore[scope];
+                            const ifName = scope.replace("interface ", "");
+                            const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+                            if (!isPhysical) device.registeredInterfaces.delete(ifName);
+                        });
+                        return "";
                     }
                     device.mode = "if";
                     device.currentScope = scopes;
@@ -687,13 +773,19 @@ const commandTree = {
             "Ethernet": { maxArgs: 1, action: makeIfAction("Ethernet") },
             "Serial": { maxArgs: 1, action: makeIfAction("Serial") },
             "vlan": { maxArgs: 1, action: makeIfAction("Vlan") },
+            "Port-channel": { maxArgs: 1, action: makeIfAction("Port-channel") },
             maxArgs: 2,
             action: makeIfAction("")
         },
         "vlan": {
             maxArgs: 1,
-            action: (device, args) => {
+            // ★修正: isAutoNo によるVLANブロックの完全削除対応
+            action: (device, args, isAutoNo) => {
                 if (args.length === 0) return "% Incomplete command.";
+                if (isAutoNo) {
+                    delete device.configStore[`vlan ${args[0]}`];
+                    return "";
+                }
                 device.mode = "vlan";
                 device.currentScope = `vlan ${args[0]}`;
                 return "";
@@ -725,15 +817,19 @@ const commandTree = {
         "router": {
             "ospf": {
                 maxArgs: 1,
-                action: (device, args) => {
+                // ★修正: isAutoNo によるOSPFプロセスの完全削除対応
+                action: (device, args, isAutoNo) => {
                     if (args.length === 0) return "% Incomplete command.";
+                    if (isAutoNo) {
+                        delete device.configStore[`router ospf ${args[0]}`];
+                        return "";
+                    }
                     device.mode = "router";
                     device.currentScope = `router ospf ${args[0]}`;
                     return "";
                 }
             }
         },
-        // ★修正: lldp run を実機同様にグローバル設定のみに復元
         "lldp": {
             "run": {
                 maxArgs: 0,
@@ -755,6 +851,19 @@ const commandTree = {
     },
     
     "if": {
+        "channel-group": {
+            maxArgs: 3,
+            action: (device, args) => {
+                if (args.length < 3 || args[1].toLowerCase() !== "mode") return "% Incomplete command.";
+                const groupNum = args[0];
+                const mode = args[2].toLowerCase();
+                const validModes = ["active", "passive", "desirable", "auto", "on"];
+                if (!validModes.includes(mode)) return "% Invalid input detected at '^' marker.";
+                
+                device.setConfig("channel_group", `channel-group ${groupNum} mode ${mode}`);
+                return "";
+            }
+        },
         "ip": {
             "address": {
                 maxArgs: 2,
@@ -770,6 +879,33 @@ const commandTree = {
 
                     device.setConfig("ip_address", `ip address ${ip} ${mask}`);
                     return "";
+                }
+            },
+            // ★修正: ospf 周りのヘルプ表示を正しく見せるための分割配置
+            "ospf": {
+                "cost": {
+                    maxArgs: 1,
+                    action: (device, args) => {
+                        if (args.length === 0) return "% Incomplete command.";
+                        device.setConfig("ip_ospf_cost", `ip ospf cost ${args[0]}`);
+                        return "";
+                    }
+                },
+                "priority": {
+                    maxArgs: 1,
+                    action: (device, args) => {
+                        if (args.length === 0) return "% Incomplete command.";
+                        device.setConfig("ip_ospf_priority", `ip ospf priority ${args[0]}`);
+                        return "";
+                    }
+                },
+                action: (device, args) => {
+                    if (args.length === 0) return "% Incomplete command.";
+                    if (args.length >= 3 && args[1].toLowerCase() === "area") {
+                        device.setConfig("ip_ospf_area", `ip ospf ${args[0]} area ${args[2]}`);
+                        return "";
+                    }
+                    return "% Invalid input detected at '^' marker.";
                 }
             }
         },
@@ -851,12 +987,47 @@ const commandTree = {
     },
 
     "router": {
+        "router-id": {
+            maxArgs: 1,
+            action: (device, args) => {
+                if (args.length === 0) return "% Incomplete command.";
+                if (!isValidIpAddress(args[0])) return "% OSPF: Invalid address";
+                device.setConfig("router_id", `router-id ${args[0]}`);
+                return "";
+            }
+        },
         "network": {
             maxArgs: 4,
             action: (device, args) => {
                 if (args.length < 4 || args[2].toLowerCase() !== "area") return "% Incomplete command.";
                 device.setConfig(`network_${args[0]}_${args[1]}`, `network ${args[0]} ${args[1]} area ${args[3]}`);
                 return "";
+            }
+        },
+        "passive-interface": {
+            maxArgs: 1,
+            action: (device, args) => {
+                if (args.length === 0) return "% Incomplete command.";
+                const ifName = args[0].toLowerCase() === "default" ? "default" : device._normalizeInterfaceName(args[0]);
+                device.setConfig(`passive_interface_${ifName}`, `passive-interface ${ifName}`);
+                return "";
+            }
+        },
+        "default-information": {
+            maxArgs: 2,
+            action: (device, args) => {
+                if (args.length === 0 || args[0].toLowerCase() !== "originate") return "% Incomplete command.";
+                const always = args[1] && args[1].toLowerCase() === "always" ? " always" : "";
+                device.setConfig("default_information", `default-information originate${always}`);
+                return "";
+            }
+        },
+        "auto-cost": {
+            maxArgs: 2,
+            action: (device, args) => {
+                if (args.length < 2 || args[0].toLowerCase() !== "reference-bandwidth") return "% Incomplete command.";
+                device.setConfig("auto_cost", `auto-cost reference-bandwidth ${args[1]}`);
+                return "% OSPF: Reference bandwidth is changed.\n        Please ensure reference bandwidth is consistent across all routers.";
             }
         }
     },
