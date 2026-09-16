@@ -1629,7 +1629,7 @@ function addSimTaskUI(task = null) {
         </div>
         <div class="form-group">
             <label>タスクの指示</label>
-            <input type="text" class="task-instruction" placeholder="例: ホスト名を CoreSW に設定してください。" value="${task?.instruction || ''}" style="width: 100%; padding: 8px;">
+            <textarea class="task-instruction" placeholder="例: ホスト名を CoreSW に設定してください。" rows="3" style="width: 100%; padding: 8px; resize: vertical;">${task?.instruction || ''}</textarea>
         </div>
         <div class="form-group">
             <label>解説・解答例 (練習モードで表示されます)</label>

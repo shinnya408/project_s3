@@ -65,6 +65,14 @@ class VirtualDevice {
     }
 
     setConfig(key, commandString, scope = this.currentScope) {
+        if (Array.isArray(scope)) {
+            scope.forEach(s => this._setConfigSingle(key, commandString, s));
+        } else {
+            this._setConfigSingle(key, commandString, scope);
+        }
+    }
+
+    _setConfigSingle(key, commandString, scope) {
         if (!this.configStore[scope]) this.configStore[scope] = {};
         if (commandString === null) {
             delete this.configStore[scope][key];
@@ -78,30 +86,107 @@ class VirtualDevice {
             case "user": return `${this.hostname}>`;
             case "priv": return `${this.hostname}#`;
             case "global": return `${this.hostname}(config)#`;
-            case "if": return `${this.hostname}(config-if)#`;
+            case "if": 
+                return Array.isArray(this.currentScope) ? `${this.hostname}(config-if-range)#` : `${this.hostname}(config-if)#`;
             case "router": return `${this.hostname}(config-router)#`;
             case "vlan": return `${this.hostname}(config-vlan)#`;
             default: return `${this.hostname}>`;
         }
     }
 
+    getRegisteredInterfaces() {
+        return Array.from(this.registeredInterfaces);
+    }
+
     _normalizeInterfaceName(name) {
         if (!name) return "";
-        // ★修正: プレフィックス(文字)とサフィックス(数字)を安全に分離してバグを防ぐ
         const match = name.match(/^([a-zA-Z]+)(.*)$/);
         if (!match) return name;
         
         const prefix = match[1].toLowerCase();
         const suffix = match[2];
         
-        if (prefix.startsWith('g')) return 'GigabitEthernet' + suffix;
-        if (prefix.startsWith('f')) return 'FastEthernet' + suffix;
-        if (prefix.startsWith('s')) return 'Serial' + suffix;
-        if (prefix.startsWith('e')) return 'Ethernet' + suffix;
-        if (prefix.startsWith('vl')) return 'Vlan' + suffix;
-        if (prefix.startsWith('lo')) return 'Loopback' + suffix;
+        // ★修正: 厳密なプレフィックス判定
+        if (/^g$|^gi$|^gig$|^gigabitethernet$/i.test(prefix)) return 'GigabitEthernet' + suffix;
+        if (/^f$|^fa$|^fastethernet$/i.test(prefix)) return 'FastEthernet' + suffix;
+        if (/^s$|^se$|^serial$/i.test(prefix)) return 'Serial' + suffix;
+        if (/^e$|^et$|^eth$|^ethernet$/i.test(prefix)) return 'Ethernet' + suffix;
+        if (/^vl$|^vlan$/i.test(prefix)) return 'Vlan' + suffix;
+        if (/^lo$|^loopback$/i.test(prefix)) return 'Loopback' + suffix;
         
         return name;
+    }
+
+    // ★修正: 存在しないポートは厳密にエラーにし、後半の英字にも対応するパーサー
+    _parseInterfaceRangeArgs(args) {
+        const fullStr = args.join(""); 
+        const parts = fullStr.split(",");
+        const resultScopes = [];
+
+        for (const part of parts) {
+            if (!part) continue;
+            
+            const dashIndex = part.indexOf("-");
+            if (dashIndex !== -1) {
+                const startStr = part.substring(0, dashIndex);
+                const endStr = part.substring(dashIndex + 1);
+                
+                const matchStart = startStr.match(/^([a-zA-Z]+)(\d*\/?.*?\/?)(\d+)$/);
+                if (!matchStart) return "% Invalid interface range";
+                
+                const prefix = matchStart[1];
+                const middle = matchStart[2];
+                const startNum = parseInt(matchStart[3], 10);
+                
+                let endNum;
+                const matchEnd = endStr.match(/^([a-zA-Z]+)?(\d*\/?.*?\/?)(\d+)$/);
+                if (matchEnd) {
+                    if (matchEnd[1] && matchEnd[1].toLowerCase() !== prefix.toLowerCase()) {
+                        return "% Invalid interface range";
+                    }
+                    endNum = parseInt(matchEnd[3], 10);
+                } else {
+                    endNum = parseInt(endStr, 10);
+                }
+                
+                if (isNaN(startNum) || isNaN(endNum) || startNum > endNum) {
+                    return "% Invalid interface range";
+                }
+                
+                for (let i = startNum; i <= endNum; i++) {
+                    const rawIfName = prefix + middle + i;
+                    const ifName = this._normalizeInterfaceName(rawIfName);
+                    
+                    const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+                    if (!validTypes.test(ifName)) return "% Invalid interface range";
+                    
+                    const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+                    if (isPhysical) {
+                        if (!this.isInitialized) {
+                            this.registeredInterfaces.add(ifName);
+                        } else if (!this.registeredInterfaces.has(ifName)) {
+                            return "% Invalid interface range"; 
+                        }
+                    }
+                    resultScopes.push(`interface ${ifName}`);
+                }
+            } else {
+                const ifName = this._normalizeInterfaceName(part);
+                const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+                if (!validTypes.test(ifName)) return "% Invalid interface range";
+
+                const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
+                if (isPhysical) {
+                    if (!this.isInitialized) {
+                        this.registeredInterfaces.add(ifName);
+                    } else if (!this.registeredInterfaces.has(ifName)) {
+                        return "% Invalid interface range";
+                    }
+                }
+                resultScopes.push(`interface ${ifName}`);
+            }
+        }
+        return resultScopes;
     }
 
     _getTreeForMode() {
@@ -297,11 +382,9 @@ class VirtualDevice {
         }
         const currentToken = tokens[0].toLowerCase();
 
-        // ★修正: Action等のシステムプロパティを無視し、真のサブコマンドのみを検索対象にする
         const subKeys = Object.keys(node).filter(k => typeof node[k] === 'object' && node[k] !== null);
         let matches = subKeys.filter(k => k.toLowerCase().startsWith(currentToken));
 
-        // ★修正: サブコマンドにマッチしない場合、引数（ポート番号等）とみなして現在ノードのActionを実行する
         if (matches.length === 0) {
             if (node.action) {
                 return { action: node.action, args: tokens, maxArgs: node.maxArgs };
@@ -330,7 +413,6 @@ class VirtualDevice {
         }
         conf += "!\n";
         
-        // ★修正: 設定が空っぽでも、登録された物理インターフェイスは全て出力する
         const scopesToPrint = new Set(Object.keys(this.configStore).filter(s => s !== "global"));
         this.registeredInterfaces.forEach(ifName => scopesToPrint.add(`interface ${ifName}`));
 
@@ -356,8 +438,13 @@ const makeIfAction = (prefix) => (device, args) => {
     
     let rawIfName = prefix + args.join(""); 
     const ifName = device._normalizeInterfaceName(rawIfName);
-    const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
     
+    const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+    if (!validTypes.test(ifName)) {
+        return "% Invalid interface type and number";
+    }
+
+    const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
     if (isPhysical) {
         if (!device.isInitialized) {
             device.registeredInterfaces.add(ifName);
@@ -395,6 +482,12 @@ const makeShowIfAction = (prefix) => (device, args) => {
         return out.trim() || "No interfaces configured.";
     } else {
         const ifName = device._normalizeInterfaceName(rawIfName);
+        
+        const validTypes = /^(GigabitEthernet|FastEthernet|Ethernet|Serial|Vlan|Loopback)/i;
+        if (!validTypes.test(ifName)) {
+            return "% Invalid interface type and number";
+        }
+
         const scope = `interface ${ifName}`;
         const isPhysical = /^(GigabitEthernet|FastEthernet|Ethernet|Serial)/i.test(ifName);
         
@@ -483,7 +576,6 @@ const commandTree = {
                 }
             }
         },
-        // ★追加: Pingコマンドの実装（ログ出力付き）
         "ping": {
             maxArgs: 1,
             action: (device, args) => {
@@ -504,7 +596,6 @@ const commandTree = {
                 maxArgs: 0,
                 action: makeShowIfAction("")
             },
-            // ★追加: show interface (特定のIFを指定する形)
             "interface": {
                 "FastEthernet": { maxArgs: 1, action: makeShowIfAction("FastEthernet") },
                 "GigabitEthernet": { maxArgs: 1, action: makeShowIfAction("GigabitEthernet") },
@@ -575,8 +666,22 @@ const commandTree = {
                 return "";
             }
         },
-        // ★修正: Tab補完と自由入力を両立させた interface コマンド
         "interface": {
+            "range": {
+                action: (device, args) => {
+                    if (args.length === 0) return "% Incomplete command.";
+                    const scopes = device._parseInterfaceRangeArgs(args);
+                    if (typeof scopes === 'string') {
+                        return scopes; 
+                    }
+                    if (scopes.length === 0) {
+                        return "% Invalid interface range";
+                    }
+                    device.mode = "if";
+                    device.currentScope = scopes;
+                    return "";
+                }
+            },
             "FastEthernet": { maxArgs: 1, action: makeIfAction("FastEthernet") },
             "GigabitEthernet": { maxArgs: 1, action: makeIfAction("GigabitEthernet") },
             "Ethernet": { maxArgs: 1, action: makeIfAction("Ethernet") },
@@ -628,11 +733,12 @@ const commandTree = {
                 }
             }
         },
+        // ★修正: lldp run を実機同様にグローバル設定のみに復元
         "lldp": {
             "run": {
                 maxArgs: 0,
                 action: (device) => {
-                    device.setConfig("lldp", "lldp run");
+                    device.setConfig("lldp", "lldp run", "global");
                     return "";
                 }
             }
@@ -641,7 +747,7 @@ const commandTree = {
             "run": {
                 maxArgs: 0,
                 action: (device) => {
-                    device.setConfig("cdp", "cdp run");
+                    device.setConfig("cdp", "cdp run", "global");
                     return "";
                 }
             }

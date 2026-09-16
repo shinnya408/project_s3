@@ -398,7 +398,7 @@ function renderTasksList(tasks) {
                 <span id="task-status-icon-${idx}" class="task-status-badge unaccomplished">⬜ 未達成</span>
                 <span class="task-number">Task ${idx + 1}</span>
             </div>
-            <p class="task-instruction-text">${escapeHtml(task.instruction || '')}</p>
+            <p class="task-instruction-text" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(task.instruction || '')}</p>
             ${expHtml}
         `;
         container.appendChild(taskBox);
