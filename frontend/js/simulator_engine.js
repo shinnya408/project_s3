@@ -890,7 +890,10 @@ class VirtualDevice {
 
         try {
             if (scopeType === 'global') {
-                // ★追加: clear ip ospf process の採点判定
+                // ★追加: copy run start の採点判定をエンジン内部に完全統合
+                if (baseCond === 'copy running-config startup-config' || baseCond === 'copy run start') {
+                    return isNo ? !this.startupConfigSaved : this.startupConfigSaved === true;
+                }
                 if (baseCond === 'clear ip ospf process') {
                     return isNo ? !this.ospfProcessCleared : this.ospfProcessCleared === true;
                 }
@@ -910,6 +913,11 @@ class VirtualDevice {
                 const intf = state.interfaces[scopeId];
                 if (!intf) return isNo ? true : false; 
                 
+                // ★追加: description の採点判定 (大文字小文字を区別しない)
+                if (baseCond.startsWith('description ')) {
+                    const matches = (intf.description || '').toLowerCase() === baseCond.substring(12).trim();
+                    return isNo ? !matches : matches;
+                }
                 if (baseCond === 'shutdown') return isNo ? intf.shutdown === false : intf.shutdown === true;
                 if (baseCond.startsWith('ip address ')) {
                     const parts = baseCond.split(' ');
@@ -931,7 +939,6 @@ class VirtualDevice {
                     const cost = baseCond.split(' ')[3];
                     return isNo ? intf.ospfCost !== cost : intf.ospfCost === cost;
                 }
-                // ★追加: OSPF Priorityの採点
                 if (baseCond.startsWith('ip ospf priority ')) {
                     const prio = baseCond.split(' ')[3];
                     return isNo ? intf.ospfPriority !== prio : intf.ospfPriority === prio;
@@ -948,7 +955,8 @@ class VirtualDevice {
                 const vlan = state.vlans[scopeId];
                 if (!vlan) return isNo ? true : false;
                 if (baseCond.startsWith('name ')) {
-                    const matches = vlan.name === baseCond.substring(5).trim();
+                    // ★修正: vlan name の大文字小文字を区別せずに比較する
+                    const matches = (vlan.name || '').toLowerCase() === baseCond.substring(5).trim();
                     return isNo ? !matches : matches;
                 }
             } else if (scopeType === 'router') {
