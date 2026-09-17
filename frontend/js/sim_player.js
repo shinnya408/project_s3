@@ -264,11 +264,15 @@ function setupConsoleInput() {
             e.preventDefault();
             const command = inputEl.value;
             inputEl.value = '';
+            
+            // ★追加: コマンド実行前に対話中かどうかを判定
+            const isInteractive = activeDevice ? !!activeDevice.interactiveState : false;
+            
             executeCommand(command);
 
-            // 履歴に保存し、インデックスを最新リセット
-            if (currentInput.trim() !== '') {
-                commandHistory.push(currentInput);
+            // ★修正: 対話中だった場合は履歴に保存しない
+            if (command.trim() !== '' && !isInteractive) {
+                commandHistory.push(command);
             }
             historyIndex = commandHistory.length;
         } else if (e.key === 'Tab') {
@@ -330,7 +334,11 @@ function focusConsoleInput(event) {
 
 function executeCommand(commandStr) {
     appendConsoleOutput(`${activeDevice.getPrompt()} ${commandStr}`);
-    if (commandStr.trim()) {
+    
+    const isInteractive = !!activeDevice.interactiveState;
+    
+    // ★修正: 対話中であれば空打ち（Enterのみ）もエンジンに処理させる
+    if (commandStr.trim() !== '' || isInteractive) {
         const result = activeDevice.processCommand(commandStr);
         if (result) appendConsoleOutput(result);
     }
@@ -509,24 +517,29 @@ function checkRuleCondition(device, scope, conditionStr) {
         return device.startupConfigSaved === true;
     }
 
+    // ★追加: V2エンジンのデータモデル直接検証機能を優先利用
+    if (typeof device.verifyState === 'function') {
+        const isVerified = device.verifyState(scope, expectedCond);
+        // V2エンジンが処理できた場合 (null以外) はその結果を採用
+        if (isVerified !== null) return isVerified;
+    }
+
+    // --- ここから下は、V2未登録コマンドのための安全なフォールバック（旧テキスト検索） ---
     const configText = device.generateRunningConfig();
     if (!configText) return false;
 
     const lines = configText.split('\n');
     let targetScope = normalize(scope || 'global');
 
-    // ★追加: 採点ルールのスコープも、実機と同じように正規化して判定ズレを防ぐ
     if (targetScope.startsWith('interface ')) {
         const ifName = targetScope.replace('interface ', '').replace(/\s+/g, '');
-        targetScope = 'interface ' + device._normalizeInterfaceName(ifName).toLowerCase();
+        targetScope = 'interface ' + (device._normalizeInterfaceName ? device._normalizeInterfaceName(ifName) : ifName).toLowerCase();
     }
 
-    // 【ヘルパー関数】指定した文字列が対象スコープ内に存在するかチェックする
     const existsInScope = (searchStr) => {
         if (targetScope === 'global') {
             return lines.some(line => !line.startsWith(' ') && normalize(line) === searchStr);
         }
-
         let inTargetScope = false;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -536,7 +549,6 @@ function checkRuleCondition(device, scope, conditionStr) {
                 inTargetScope = true;
                 continue;
             }
-
             if (inTargetScope) {
                 if (line === '!' || (!line.startsWith(' ') && line.trim() !== '')) break;
                 if (normalizedLine === searchStr) return true;
@@ -545,15 +557,11 @@ function checkRuleCondition(device, scope, conditionStr) {
         return false;
     };
 
-    // 1. そのままの文字列が存在すれば正解
     if (existsInScope(expectedCond)) return true;
-
-    // 2. 存在せず、かつ条件が "no " から始まる場合（否定条件の評価）
     if (expectedCond.startsWith('no ')) {
         const negativeTarget = expectedCond.substring(3).trim();
         return !existsInScope(negativeTarget);
     }
-
     return false;
 }
 

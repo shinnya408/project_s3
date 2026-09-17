@@ -1530,35 +1530,32 @@ document.getElementById('sim-console-input')?.addEventListener('keydown', functi
     if (e.key === 'Enter') {
         e.preventDefault();
         
-        // 未初期化の場合は初期化
         if (!editorDevice && typeof VirtualDevice !== 'undefined') resetEditorConsole();
         
         const cmd = e.target.value;
-        e.target.value = ''; // 入力欄をクリア
+        e.target.value = ''; 
+
+        // ★追加: コマンド実行前に対話中かどうかを判定
+        const isInteractive = editorDevice ? !!editorDevice.interactiveState : false;
 
         const outDiv = document.getElementById('sim-console-output');
-        
-        // 1. プロンプトと入力されたコマンドを印字
         outDiv.innerHTML += `<div><span style="color:#fbbf24;">${editorDevice ? editorDevice.getPrompt() : '>'}</span> ${cmd}</div>`;
         
         if (editorDevice) {
-            // 2. コマンドを実行
-            const output = editorDevice.processCommand(cmd);
-            
-            // 3. 結果があれば安全にエンコードして印字
-            if (output) {
-                const safeOutput = output.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                outDiv.innerHTML += `<div style="color:#f87171;">${safeOutput}</div>`;
+            // ★修正: 対話中は空打ちでも実行する
+            if (cmd.trim() !== '' || isInteractive) {
+                const output = editorDevice.processCommand(cmd);
+                if (output) {
+                    const safeOutput = output.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    outDiv.innerHTML += `<div style="color:#f87171;">${safeOutput}</div>`;
+                }
             }
-            
-            // 4. プロンプトの表示を更新
             document.getElementById('sim-console-prompt').textContent = editorDevice.getPrompt();
         }
-        
         outDiv.scrollTop = outDiv.scrollHeight;
 
-        // 5. 履歴に保存
-        if (cmd.trim() !== '') {
+        // ★修正: 対話中だった場合は履歴に保存しない
+        if (cmd.trim() !== '' && !isInteractive) {
             commandHistory.push(cmd);
         }
         historyIndex = commandHistory.length;
@@ -1737,24 +1734,38 @@ function generateRulesForTask(btn) {
     const container = btn.closest('div').nextElementSibling; 
     const devPrefix = activeEditorDeviceName + '::';
     
-    // 現在のデバイスの configStore を展開してすべて抽出
-    const store = editorDevice.configStore;
+    // V2エンジン: generateRunningConfig() で現在の完全な状態テキストを取得
+    const configText = editorDevice.generateRunningConfig();
+    const lines = configText.split('\n');
+    
+    let currentScope = 'global';
     let ruleCount = 0;
 
-    for (const [scopeName, settings] of Object.entries(store)) {
-        // scopeName は "global", "interface GigabitEthernet0/0", "vlan 10" など
-        const ruleScope = `${devPrefix}${scopeName}`;
+    for (let line of lines) {
+        // 空行や ! や end はスキップ (ただし ! が来たらスコープを念のためグローバルに戻す)
+        if (!line || line.trim() === 'end') continue;
+        if (line.trim() === '!') {
+            currentScope = 'global';
+            continue;
+        }
 
-        for (const [key, commandStr] of Object.entries(settings)) {
-            // 初期状態から存在するデフォルトのホスト名は抽出しない
-            if (scopeName === 'global' && key === 'hostname') {
-                if (commandStr === 'hostname Router' || commandStr === `hostname ${activeEditorDeviceName}`) {
-                    continue;
+        if (!line.startsWith(' ')) {
+            // インデントなし（グローバルスコープのコマンド または モード遷移コマンド）
+            if (line.startsWith('interface ') || line.startsWith('vlan ') || line.startsWith('router ospf ')) {
+                currentScope = line.trim();
+            } else {
+                currentScope = 'global'; // 念のため
+                // デフォルトのホスト名は除外
+                if (line.startsWith('hostname ')) {
+                    const hn = line.substring(9).trim();
+                    if (hn === 'Router' || hn === activeEditorDeviceName) continue;
                 }
+                addSimRuleUI(container, `${devPrefix}global`, line.trim());
+                ruleCount++;
             }
-            
-            // ルールをUIに追加 (スコープ、条件となるコマンド文字列)
-            addSimRuleUI(container, ruleScope, commandStr);
+        } else {
+            // インデントあり（サブモードのコマンド）
+            addSimRuleUI(container, `${devPrefix}${currentScope}`, line.trim());
             ruleCount++;
         }
     }
