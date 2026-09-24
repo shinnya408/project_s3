@@ -159,7 +159,6 @@ const CommandTypes = {
         help: "  <1-65535>   Cost",
         validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 1 && n <= 65535; }
     },
-    // ★追加: OSPF Priority用
     OSPF_PRIORITY: {
         help: "  <0-255>     Priority",
         validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 0 && n <= 255; }
@@ -171,6 +170,35 @@ const CommandTypes = {
     CHANNEL_MODE: {
         help: "active      Enable LACP unconditionally\nauto        Enable PAgP only if a PAgP device is detected\ndesirable   Enable PAgP unconditionally\non          Enable Etherchannel only\npassive     Enable LACP only if a LACP device is detected",
         validate: (val) => /^(active|passive|desirable|auto|on)$/i.test(val)
+    },
+    // ★追加: ACL/NAT/STP用の型定義
+    ACL_NUM: {
+        help: "  <1-199>     Access list number",
+        validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 1 && n <= 199; }
+    },
+    ACL_ACTION: {
+        help: "  permit      Specify packets to forward\n  deny        Specify packets to reject",
+        validate: (val) => /^(permit|deny)$/i.test(val)
+    },
+    TRAFFIC_DIR: {
+        help: "  in          inbound packets\n  out         outbound packets",
+        validate: (val) => /^(in|out)$/i.test(val)
+    },
+    NAT_DIR: {
+        help: "  inside      Inside interface for NAT\n  outside     Outside interface for NAT",
+        validate: (val) => /^(inside|outside)$/i.test(val)
+    },
+    STP_MODE: {
+        help: "  pvst        Per-Vlan spanning tree mode\n  rapid-pvst  Per-Vlan rapid spanning tree mode",
+        validate: (val) => /^(pvst|rapid-pvst)$/i.test(val)
+    },
+    STP_ROOT: {
+        help: "  primary     Configure this switch as primary root\n  secondary   Configure switch as secondary root",
+        validate: (val) => /^(primary|secondary)$/i.test(val)
+    },
+    STP_PRIORITY: {
+        help: "  <0-61440>   bridge priority in increments of 4096",
+        validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 0 && n <= 61440 && n % 4096 === 0; }
     },
     TEXT: {
         help: "  LINE        Text string (allows spaces)",
@@ -207,19 +235,18 @@ const commandSchema = [
         mode: "priv",
         help: "Reset OSPF process",
         action: (device) => {
-            // ★対話プロンプトの状態をセット
             device.interactiveState = {
                 promptText: "Reset ALL OSPF processes? [no]: ",
                 handler: (dev, input) => {
                     const ans = input.trim().toLowerCase();
                     if (ans === 'y' || ans === 'yes') {
-                        dev.ospfProcessCleared = true; // ★追加: "yes" と答えたらフラグを立てる
+                        dev.ospfProcessCleared = true; 
                         return "OSPF processes reset";
                     }
                     return "";
                 }
             };
-            return ""; // 出力は出さずにプロンプトを待機させる
+            return ""; 
         }
     },
     {
@@ -230,7 +257,7 @@ const commandSchema = [
             device.interactiveState = {
                 promptText: "Destination filename [startup-config]? ",
                 handler: (dev, input) => {
-                    dev.startupConfigSaved = true; // 採点フラグを立てる
+                    dev.startupConfigSaved = true; 
                     return "Building configuration...\n[OK]";
                 }
             };
@@ -286,6 +313,98 @@ const commandSchema = [
         },
         noAction: (device, args) => { delete device.state.ospf[args.id]; }
     },
+    
+    // ★追加: ACL (Access Control List)
+    {
+        pattern: "no access-list {id:ACL_NUM}",
+        mode: "global",
+        help: "Remove an entire access list",
+        action: (device, args) => { delete device.state.acls[args.id]; }
+    },
+    {
+        pattern: "access-list {id:ACL_NUM} {action:ACL_ACTION} {rule:TEXT}",
+        mode: "global",
+        help: "Configure access-list rules (e.g. '10 permit 192.168.1.0 0.0.0.255' or '10 permit any')",
+        action: (device, args) => {
+            if (!device.state.acls[args.id]) device.state.acls[args.id] = [];
+            // 同じルールがなければ追加
+            if (!device.state.acls[args.id].some(r => r.action === args.action.toLowerCase() && r.rule === args.rule)) {
+                device.state.acls[args.id].push({ action: args.action.toLowerCase(), rule: args.rule });
+            }
+        },
+        noAction: (device, args) => {
+            if (device.state.acls[args.id]) {
+                device.state.acls[args.id] = device.state.acls[args.id].filter(r => !(r.action === args.action.toLowerCase() && r.rule === args.rule));
+                if(device.state.acls[args.id].length === 0) delete device.state.acls[args.id];
+            }
+        }
+    },
+    
+    // ★追加: NAT (Network Address Translation)
+    {
+        pattern: "ip nat inside source static {local:IPV4} {global:IPV4}",
+        mode: "global",
+        help: "Static NAT translation",
+        action: (device, args) => {
+            if (!device.state.nat.static) device.state.nat.static = [];
+            if (!device.state.nat.static.some(n => n.local === args.local && n.global === args.global)) {
+                device.state.nat.static.push({ local: args.local, global: args.global });
+            }
+        },
+        noAction: (device, args) => {
+            if (device.state.nat.static) {
+                device.state.nat.static = device.state.nat.static.filter(n => !(n.local === args.local && n.global === args.global));
+            }
+        }
+    },
+    {
+        pattern: "ip nat inside source list {acl:ACL_NUM} interface {id:IF_ID} overload",
+        mode: "global",
+        help: "Dynamic NAT (PAT) via interface",
+        action: (device, args) => {
+            if (!device.state.nat.dynamic) device.state.nat.dynamic = [];
+            const intf = normalizeInterfaceName(args.id);
+            if (!device.state.nat.dynamic.some(n => String(n.acl) === args.acl && n.intf === intf)) {
+                device.state.nat.dynamic.push({ acl: args.acl, intf: intf });
+            }
+        },
+        noAction: (device, args) => {
+            if (device.state.nat.dynamic) {
+                const intf = normalizeInterfaceName(args.id);
+                device.state.nat.dynamic = device.state.nat.dynamic.filter(n => !(String(n.acl) === args.acl && n.intf === intf));
+            }
+        }
+    },
+
+    // ★追加: STP (Spanning Tree Protocol)
+    {
+        pattern: "spanning-tree mode {mode:STP_MODE}",
+        mode: "global",
+        help: "Spanning tree operating mode",
+        action: (device, args) => { device.state.stpMode = args.mode.toLowerCase(); },
+        noAction: (device) => { delete device.state.stpMode; }
+    },
+    {
+        pattern: "spanning-tree vlan {id:VLAN_ID} root {type:STP_ROOT}",
+        mode: "global",
+        help: "Configure switch as root",
+        action: (device, args) => {
+            if(!device.state.stpRoot) device.state.stpRoot = {};
+            device.state.stpRoot[args.id] = args.type.toLowerCase();
+        },
+        noAction: (device, args) => { if(device.state.stpRoot) delete device.state.stpRoot[args.id]; }
+    },
+    {
+        pattern: "spanning-tree vlan {id:VLAN_ID} priority {prio:STP_PRIORITY}",
+        mode: "global",
+        help: "Set the bridge priority",
+        action: (device, args) => {
+            if(!device.state.stpPriority) device.state.stpPriority = {};
+            device.state.stpPriority[args.id] = args.prio;
+        },
+        noAction: (device, args) => { if(device.state.stpPriority) delete device.state.stpPriority[args.id]; }
+    },
+
     {
         pattern: "lldp run",
         mode: "global",
@@ -454,7 +573,6 @@ const commandSchema = [
         action: (device, args) => { applyToScopes(device, intf => intf.ospfCost = args.cost); },
         noAction: (device) => { applyToScopes(device, intf => delete intf.ospfCost); }
     },
-    // ★追加: OSPF Priorityの実装
     {
         pattern: "ip ospf priority {priority:OSPF_PRIORITY}",
         mode: "if",
@@ -468,6 +586,48 @@ const commandSchema = [
         action: (device, args) => { applyToScopes(device, intf => intf.ospfArea = { pid: args.pid, area: args.area }); },
         noAction: (device) => { applyToScopes(device, intf => delete intf.ospfArea); }
     },
+    
+    // ★追加: ACL (IF適用)
+    {
+        pattern: "ip access-group {acl:ACL_NUM} {dir:TRAFFIC_DIR}",
+        mode: "if",
+        help: "Access control list for packets",
+        action: (device, args) => {
+            applyToScopes(device, intf => {
+                if (!intf.accessGroup) intf.accessGroup = {};
+                intf.accessGroup[args.dir.toLowerCase()] = args.acl;
+            });
+        },
+        noAction: (device, args) => {
+            applyToScopes(device, intf => {
+                if (intf.accessGroup) delete intf.accessGroup[args.dir.toLowerCase()];
+            });
+        }
+    },
+    // ★追加: NAT (IF適用)
+    {
+        pattern: "ip nat {dir:NAT_DIR}",
+        mode: "if",
+        help: "NAT interface commands",
+        action: (device, args) => { applyToScopes(device, intf => intf.ipNat = args.dir.toLowerCase()); },
+        noAction: (device) => { applyToScopes(device, intf => delete intf.ipNat); }
+    },
+    // ★追加: STP (IF適用)
+    {
+        pattern: "spanning-tree portfast",
+        mode: "if",
+        help: "Enable portfast on the interface",
+        action: (device) => { applyToScopes(device, intf => intf.stpPortfast = true); },
+        noAction: (device) => { applyToScopes(device, intf => intf.stpPortfast = false); }
+    },
+    {
+        pattern: "spanning-tree bpduguard enable",
+        mode: "if",
+        help: "Enable BPDU guard on the interface",
+        action: (device) => { applyToScopes(device, intf => intf.stpBpduGuard = true); },
+        noAction: (device) => { applyToScopes(device, intf => intf.stpBpduGuard = false); }
+    },
+
     {
         pattern: "cdp enable",
         mode: "if",
@@ -493,7 +653,6 @@ const commandSchema = [
         mode: "priv",
         action: (device) => device.generateRunningConfig()
     },
-    // ★追加: show ip route
     {
         pattern: "show ip route",
         mode: "priv",
@@ -532,11 +691,9 @@ const commandSchema = [
         help: "VLAN status",
         action: (device) => {
             let out = "VLAN Name                             Status    Ports\n---- -------------------------------- --------- -------------------------------";
-            // デフォルトVLANの表示
             out += "\n1    default                          active    ";
-            // 作成されたVLANの表示
             for (const [id, vlan] of Object.entries(device.state.vlans)) {
-                if (parseInt(id, 10) === 1) continue; // ★追加: デフォルトVLANとの重複出力を防ぐ
+                if (parseInt(id, 10) === 1) continue; 
                 out += `\n${String(id).padEnd(4)} ${(vlan.name || "VLAN" + String(id).padStart(4, '0')).padEnd(32)} active    `;
             }
             return out;
@@ -574,8 +731,7 @@ class VirtualDevice {
         this.currentScope = null;
         this.isInitialized = false;
         this.registeredInterfaces = new Set();
-        this.interactiveState = null; // ★追加: 対話プロンプト用ステート
-
+        this.interactiveState = null; 
         this.startupConfigSaved = false;
         this.ospfProcessCleared = false;
         
@@ -586,14 +742,18 @@ class VirtualDevice {
             interfaces: {},
             vlans: {},
             staticRoutes: {},
-            ospf: {}
+            ospf: {},
+            // ★追加: 新規プロトコル用のステート
+            acls: {},
+            nat: { static: [], dynamic: [] },
+            stpMode: null,
+            stpRoot: {},
+            stpPriority: {}
         };
     }
 
     getPrompt() {
-        // ★対話プロンプト中なら、標準のプロンプトを上書きして表示する
         if (this.interactiveState) return this.interactiveState.promptText;
-
         switch(this.mode) {
             case "user": return `${this.state.hostname}>`;
             case "priv": return `${this.state.hostname}#`;
@@ -612,6 +772,15 @@ class VirtualDevice {
         if (this.state.lldpRun) conf += "lldp run\n!\n";
         if (this.state.cdpRun) conf += "cdp run\n!\n";
 
+        // ★追加: STP Global設定
+        if (this.state.stpMode) conf += `spanning-tree mode ${this.state.stpMode}\n`;
+        if (this.state.stpRoot) {
+            for (const [v, root] of Object.entries(this.state.stpRoot)) conf += `spanning-tree vlan ${v} root ${root}\n`;
+        }
+        if (this.state.stpPriority) {
+            for (const [v, prio] of Object.entries(this.state.stpPriority)) conf += `spanning-tree vlan ${v} priority ${prio}\n`;
+        }
+
         for (const [vlanId, settings] of Object.entries(this.state.vlans)) {
             conf += `vlan ${vlanId}\n`;
             if (settings.name) conf += ` name ${settings.name}\n`;
@@ -626,8 +795,17 @@ class VirtualDevice {
             if (settings.ipAddress) conf += ` ip address ${settings.ipAddress} ${settings.subnetMask}\n`;
             else if (settings._explicitNoIp) conf += ` no ip address\n`;
             
+            // ★追加: IFのNAT, ACL, STP設定
+            if (settings.ipNat) conf += ` ip nat ${settings.ipNat}\n`;
+            if (settings.accessGroup) {
+                if (settings.accessGroup.in) conf += ` ip access-group ${settings.accessGroup.in} in\n`;
+                if (settings.accessGroup.out) conf += ` ip access-group ${settings.accessGroup.out} out\n`;
+            }
+            if (settings.stpPortfast) conf += ` spanning-tree portfast\n`;
+            if (settings.stpBpduGuard) conf += ` spanning-tree bpduguard enable\n`;
+
             if (settings.ospfCost) conf += ` ip ospf cost ${settings.ospfCost}\n`;
-            if (settings.ospfPriority !== undefined) conf += ` ip ospf priority ${settings.ospfPriority}\n`; // ★追加
+            if (settings.ospfPriority !== undefined) conf += ` ip ospf priority ${settings.ospfPriority}\n`; 
             if (settings.ospfArea) conf += ` ip ospf ${settings.ospfArea.pid} area ${settings.ospfArea.area}\n`;
             if (settings.channelGroup) conf += ` channel-group ${settings.channelGroup.id} mode ${settings.channelGroup.mode}\n`;
             if (settings.cdpEnable !== undefined) conf += settings.cdpEnable ? ` cdp enable\n` : ` no cdp enable\n`;
@@ -648,6 +826,17 @@ class VirtualDevice {
         for (const [netMask, nextHop] of Object.entries(this.state.staticRoutes)) {
             const [net, mask] = netMask.split('/');
             conf += `ip route ${net} ${mask} ${nextHop}\n`;
+        }
+
+        // ★追加: ACL と NAT のGlobal設定出力
+        if (this.state.nat.static) {
+            this.state.nat.static.forEach(n => conf += `ip nat inside source static ${n.local} ${n.global}\n`);
+        }
+        if (this.state.nat.dynamic) {
+            this.state.nat.dynamic.forEach(n => conf += `ip nat inside source list ${n.acl} interface ${n.intf} overload\n`);
+        }
+        for (const [id, rules] of Object.entries(this.state.acls)) {
+            rules.forEach(r => conf += `access-list ${id} ${r.action} ${r.rule}\n`);
         }
 
         conf += "!\nend";
@@ -673,7 +862,7 @@ class VirtualDevice {
     }
 
     getCompletion(input) {
-        if (this.interactiveState) return input; // プロンプト待機中は補完しない
+        if (this.interactiveState) return input; 
 
         const text = input.trimStart();
         const endsWithSpace = input.endsWith(' ');
@@ -737,7 +926,7 @@ class VirtualDevice {
     }
 
     getHelp(input) {
-        if (this.interactiveState) return ""; // プロンプト待機中はヘルプ無効
+        if (this.interactiveState) return ""; 
 
         const text = input.trimStart();
         const endsWithSpace = input.endsWith(' ');
@@ -806,10 +995,9 @@ class VirtualDevice {
     }
 
     processCommand(input) {
-        // ★対話プロンプト待機中の場合は、入力をハンドラーに直接流し込む
         if (this.interactiveState) {
             const state = this.interactiveState;
-            this.interactiveState = null; // 状態をリセット
+            this.interactiveState = null; 
             return state.handler(this, input);
         }
 
@@ -890,7 +1078,6 @@ class VirtualDevice {
 
         try {
             if (scopeType === 'global') {
-                // ★追加: copy run start の採点判定をエンジン内部に完全統合
                 if (baseCond === 'copy running-config startup-config' || baseCond === 'copy run start') {
                     return isNo ? !this.startupConfigSaved : this.startupConfigSaved === true;
                 }
@@ -909,11 +1096,41 @@ class VirtualDevice {
                     const exists = state.staticRoutes[key] === parts[4];
                     return isNo ? !exists : exists;
                 }
+                // ★追加: ACL/NAT/STP のGlobal採点判定
+                if (baseCond.startsWith('access-list ')) {
+                    const parts = baseCond.split(' ');
+                    const id = parts[1];
+                    const action = parts[2];
+                    const rule = parts.slice(3).join(' ');
+                    const exists = state.acls[id] && state.acls[id].some(r => r.action === action && r.rule === rule);
+                    return isNo ? !exists : exists;
+                }
+                if (baseCond.startsWith('ip nat inside source static ')) {
+                    const parts = baseCond.split(' ');
+                    const exists = state.nat.static && state.nat.static.some(n => n.local === parts[5] && n.global === parts[6]);
+                    return isNo ? !exists : exists;
+                }
+                if (baseCond.startsWith('ip nat inside source list ')) {
+                    const parts = baseCond.split(' ');
+                    const exists = state.nat.dynamic && state.nat.dynamic.some(n => String(n.acl) === parts[5] && n.intf.toLowerCase() === parts[7].toLowerCase());
+                    return isNo ? !exists : exists;
+                }
+                if (baseCond.startsWith('spanning-tree mode ')) {
+                    return isNo ? state.stpMode !== baseCond.split(' ')[2] : state.stpMode === baseCond.split(' ')[2];
+                }
+                if (baseCond.startsWith('spanning-tree vlan ') && baseCond.includes(' root ')) {
+                    const parts = baseCond.split(' ');
+                    return isNo ? !(state.stpRoot && state.stpRoot[parts[2]] === parts[4]) : (state.stpRoot && state.stpRoot[parts[2]] === parts[4]);
+                }
+                if (baseCond.startsWith('spanning-tree vlan ') && baseCond.includes(' priority ')) {
+                    const parts = baseCond.split(' ');
+                    return isNo ? !(state.stpPriority && state.stpPriority[parts[2]] === parts[4]) : (state.stpPriority && state.stpPriority[parts[2]] === parts[4]);
+                }
+
             } else if (scopeType === 'if') {
                 const intf = state.interfaces[scopeId];
                 if (!intf) return isNo ? true : false; 
                 
-                // ★追加: description の採点判定 (大文字小文字を区別しない)
                 if (baseCond.startsWith('description ')) {
                     const matches = (intf.description || '').toLowerCase() === baseCond.substring(12).trim();
                     return isNo ? !matches : matches;
@@ -951,11 +1168,24 @@ class VirtualDevice {
                 if (baseCond === 'cdp enable') return isNo ? intf.cdpEnable === false : intf.cdpEnable === true;
                 if (baseCond === 'lldp transmit') return isNo ? intf.lldpTransmit === false : intf.lldpTransmit === true;
                 if (baseCond === 'lldp receive') return isNo ? intf.lldpReceive === false : intf.lldpReceive === true;
+                
+                // ★追加: ACL/NAT/STP のIF採点判定
+                if (baseCond.startsWith('ip nat ')) {
+                    const dir = baseCond.split(' ')[2];
+                    return isNo ? intf.ipNat !== dir : intf.ipNat === dir;
+                }
+                if (baseCond.startsWith('ip access-group ')) {
+                    const parts = baseCond.split(' ');
+                    const dir = parts[3];
+                    return isNo ? !(intf.accessGroup && intf.accessGroup[dir] === parts[2]) : (intf.accessGroup && intf.accessGroup[dir] === parts[2]);
+                }
+                if (baseCond === 'spanning-tree portfast') return isNo ? !intf.stpPortfast : intf.stpPortfast === true;
+                if (baseCond === 'spanning-tree bpduguard enable') return isNo ? !intf.stpBpduGuard : intf.stpBpduGuard === true;
+
             } else if (scopeType === 'vlan') {
                 const vlan = state.vlans[scopeId];
                 if (!vlan) return isNo ? true : false;
                 if (baseCond.startsWith('name ')) {
-                    // ★修正: vlan name の大文字小文字を区別せずに比較する
                     const matches = (vlan.name || '').toLowerCase() === baseCond.substring(5).trim();
                     return isNo ? !matches : matches;
                 }

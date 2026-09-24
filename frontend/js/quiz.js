@@ -1,5 +1,6 @@
 // quiz.js
 let originalQuestions = []; 
+let baseQuestions = []; // ★追加：初期の絞り込み状態（お気に入りや弱点など）を保存しておく配列
 let currentQuestions = [];  
 let currentIndex = 0;
 let currentWorkbookId = new URLSearchParams(window.location.search).get('workbookId');
@@ -12,10 +13,8 @@ let categoryMaster = [];
 const targetUserId = new URLSearchParams(window.location.search).get('targetUserId');
 const targetUserName = new URLSearchParams(window.location.search).get('targetUserName');
 const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true' || new URLSearchParams(window.location.search).get('mode') === 'preview';
-
 const isReadOnlyMode = !!targetUserId || isPreviewMode;
 
-// ★ 追加：遷移用の共通パラメータ文字列を生成する関数
 function getExtraParams() {
     let extra = '';
     if (targetUserId) extra += `&targetUserId=${targetUserId}&targetUserName=${encodeURIComponent(targetUserName || '')}`;
@@ -28,7 +27,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!currentWorkbookId) { alert('問題集が指定されていません。'); return; }
 
     try {
-        // ★ 新APIへの1回の通信に統合
         let apiUrl = `${API_BASE_URL}/player-data?workbookId=${currentWorkbookId}`;
         if (targetUserId) apiUrl += `&targetUserId=${targetUserId}`;
 
@@ -36,7 +34,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!res.ok) throw new Error('データ取得エラー');
         const data = await res.json();
 
-        // ★ 取得したデータを各変数に振り分ける
         const mcqData = data.mcq || [];
         const ddData = data.dd || [];
         
@@ -92,6 +89,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentQuestions = [...originalQuestions];
         }
 
+        // ★追加：初期の絞り込み状態をベースとして保存しておく
+        baseQuestions = [...currentQuestions];
+
         if (currentQuestions.length === 0) { alert('問題がありません。'); return; }
         showQuestion(0);
     } catch (e) {
@@ -128,10 +128,8 @@ function showQuestion(index) {
 
     document.getElementById('progress-text').innerText = `${index + 1} / ${currentQuestions.length}`;
     document.getElementById('q-id-badge').innerText = `ID: ${q.id} (${q.format === 'mcq' ? '四択' : 'D&D'})`;
-    
     document.getElementById('q-category-badge').innerText = q.categoryMajorId ? `📁 ${getCategoryName(q.categoryMajorId)}` : '未分類';
     
-    // ★ 修正：問題文の改行を反映
     document.getElementById('q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('q-text').innerText = q.question;
     
@@ -199,7 +197,6 @@ function renderMcqPlayer(q, playArea) {
     let html = `<div class="mcq-options" style="display: flex; flex-direction: column; gap: 12px;">`;
     choices.forEach(c => {
         const safeText = c.text.toString().replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        // ★ 修正：選択肢の改行を反映 (white-space: pre-wrap;)
         html += `
             <label class="mcq-label" style="display: flex; align-items: center; padding: 15px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; background: var(--bg-card);">
                 <input type="${inputType}" name="mcq-answer" value="${c.id}" style="margin-right: 15px; transform: scale(1.3); cursor: pointer;">
@@ -292,7 +289,6 @@ function submitAnswer() {
     
     saveAndSubmitSingleHistory(q.id, q.format, isCorrect);
     
-    // ★ 修正：解説の改行を反映
     document.getElementById('exp-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('exp-text').innerText = q.explanation || '解説はありません。';
     
@@ -309,10 +305,7 @@ function submitAnswer() {
 }
 
 async function saveAndSubmitSingleHistory(questionId, format, isCorrect) {
-    if (isReadOnlyMode) {
-        console.log('プレビューまたはレビューモードのため、解答履歴は保存されません。');
-        return;
-    }
+    if (isReadOnlyMode) return;
 
     const key = `${format}_${questionId}`;
     if (!historyMap[key]) historyMap[key] = [];
@@ -340,7 +333,6 @@ function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function showListModal() {
     const container = document.getElementById('list-container');
     container.innerHTML = '';
-    
     const tree = {};
     
     currentQuestions.forEach(q => {
@@ -374,7 +366,6 @@ function showListModal() {
                 if (hist[hist.length - 1]) { mark = '⭕'; borderColor = 'var(--success)'; } 
                 else { mark = '❌'; borderColor = 'var(--danger)'; }
             }
-            // ★ 修正：改行をスペースに変換
             const safeQ = q.question.replace(/\n/g, ' ');
             const snippet = safeQ.length > 25 ? safeQ.substring(0, 25) + '...' : safeQ;
             
@@ -387,7 +378,6 @@ function showListModal() {
     }
 
     let finalHtml = '';
-
     for (const majorId in tree) {
         const majorName = majorId === 'unclassified' ? '未分類 (カテゴリなし)' : getCategoryName(parseInt(majorId));
         const majorNode = tree[majorId];
@@ -440,41 +430,112 @@ window.jumpToQuestion = function(format, id) {
     }
 };
 
+// ==========================================
+// ★ 新機能：カテゴリ指定ランダムフィルタリング
+// ==========================================
 let isShuffled = false; 
-function toggleShuffle() {
-    const btn = document.getElementById('btn-shuffle');
-    if (!isShuffled) {
-        if (confirm('問題をランダムに並び替えて最初から開始しますか？')) {
-            for (let i = currentQuestions.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [currentQuestions[i], currentQuestions[j]] = [currentQuestions[j], currentQuestions[i]];
-            }
-            isShuffled = true;
-            btn.innerHTML = '⬇️ 元に戻す';
-            btn.style.backgroundColor = 'var(--border)'; 
-            showQuestion(0);
+
+function openRandomFilterModal() {
+    // 現在のベースリスト(お気に入り等の条件適用済み)に含まれるカテゴリだけを抽出
+    const availableCategoryIds = [...new Set(baseQuestions.map(q => q.categoryMajorId))];
+    
+    const listContainer = document.getElementById('random-category-list');
+    listContainer.innerHTML = '';
+    
+    let html = '';
+    let hasUnclassified = false;
+    
+    availableCategoryIds.forEach(catId => {
+        if (!catId) {
+            hasUnclassified = true;
+            return;
         }
-    } else {
-        if (confirm('元の出題順（カテゴリ・ID順）に戻して最初から開始しますか？')) {
-            currentQuestions = [...originalQuestions];
-            const mode = new URLSearchParams(window.location.search).get('mode');
-            if (mode === 'favorite') {
-                const selectedTagIds = JSON.parse(sessionStorage.getItem('favoriteSelectedTags') || '[]');
-                currentQuestions = currentQuestions.filter(q => {
-                    const tagsForThisQ = questionTags[`${q.format}_${q.id}`] || [];
-                    return selectedTagIds.some(id => tagsForThisQ.includes(id));
-                });
-            } else if (mode === 'weakness') {
-                const weaknessKeys = JSON.parse(sessionStorage.getItem('weaknessQuestionKeys') || '[]');
-                currentQuestions = currentQuestions.filter(q => weaknessKeys.includes(`${q.format}_${q.id}`));
-            }
-            isShuffled = false;
-            btn.innerHTML = '🔀 ランダム';
-            btn.style.backgroundColor = 'var(--bg-main)'; 
-            showQuestion(0);
-        }
+        const catName = getCategoryName(catId);
+        html += `
+            <label style="cursor: pointer; display: flex; align-items: center;">
+                <input type="checkbox" class="random-cat-cb" value="${catId}" checked style="margin-right: 8px;">
+                ${catName}
+            </label>
+        `;
+    });
+    
+    if (hasUnclassified) {
+        html += `
+            <label style="cursor: pointer; display: flex; align-items: center;">
+                <input type="checkbox" class="random-cat-cb" value="unclassified" checked style="margin-right: 8px;">
+                未分類
+            </label>
+        `;
     }
+    
+    listContainer.innerHTML = html;
+    document.getElementById('random-check-all').checked = true;
+    
+    // シャッフル中なら「解除」ボタンを表示
+    if (isShuffled) {
+        document.getElementById('btn-cancel-shuffle').style.display = 'inline-block';
+    } else {
+        document.getElementById('btn-cancel-shuffle').style.display = 'none';
+    }
+    
+    document.getElementById('random-filter-modal').classList.remove('hidden');
 }
+
+function toggleAllRandomCategories(isChecked) {
+    document.querySelectorAll('.random-cat-cb').forEach(cb => cb.checked = isChecked);
+}
+
+function applyRandomFilter() {
+    const checkedCbs = document.querySelectorAll('.random-cat-cb:checked');
+    if (checkedCbs.length === 0) {
+        alert('最低1つのカテゴリを選択してください。');
+        return;
+    }
+    
+    const selectedIds = Array.from(checkedCbs).map(cb => cb.value);
+    
+    // 選択されたカテゴリのみを抽出
+    const filteredQuestions = baseQuestions.filter(q => {
+        if (!q.categoryMajorId && selectedIds.includes('unclassified')) return true;
+        return selectedIds.includes(String(q.categoryMajorId));
+    });
+    
+    if (filteredQuestions.length === 0) {
+        alert('該当する問題がありません。');
+        return;
+    }
+    
+    // 抽出したリストをシャッフル
+    for (let i = filteredQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [filteredQuestions[i], filteredQuestions[j]] = [filteredQuestions[j], filteredQuestions[i]];
+    }
+    
+    currentQuestions = filteredQuestions;
+    isShuffled = true;
+    
+    const btn = document.getElementById('btn-shuffle');
+    btn.innerHTML = '⬇️ ランダム中';
+    btn.style.backgroundColor = 'var(--border)'; 
+    btn.style.color = 'var(--text-main)';
+    
+    closeModal('random-filter-modal');
+    showQuestion(0); // 1問目からスタート
+}
+
+function cancelShuffle() {
+    // フィルタリング・シャッフルを解除し、元のベースリストに戻す
+    currentQuestions = [...baseQuestions];
+    isShuffled = false;
+    
+    const btn = document.getElementById('btn-shuffle');
+    btn.innerHTML = '🔀 ランダム';
+    btn.style.backgroundColor = 'transparent';
+    
+    closeModal('random-filter-modal');
+    showQuestion(0);
+}
+// ==========================================
 
 function renderDdPlayer(q, playArea) {
     let html = `
@@ -512,7 +573,6 @@ function renderDdPlayer(q, playArea) {
     shuffledItems.forEach((item, index) => {
         const correctZone = (item.correctZoneIndex !== undefined && item.correctZoneIndex !== null) ? item.correctZoneIndex : -1;
         const text = item.text || item.content || item.name || '';
-        // ★ 修正：D&Dアイテムの改行を反映
         const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
         let itemHtml = `<div id="drag-item-${index}" class="dd-drag-item" draggable="true" data-correct-zone="${correctZone}" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 15px; cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;">`;
         if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
@@ -690,7 +750,7 @@ document.addEventListener('keydown', (e) => {
         case 'a':
         case ' ': e.preventDefault(); submitAnswer(); break;
         case 'f': if (typeof toggleFlag === 'function') toggleFlag(); break;
-        case 'r': toggleShuffle(); break;
+        case 'r': openRandomFilterModal(); break; // ★ ショートカットの挙動もモーダル呼び出しに変更
         case 's': openQuizTagModal(); break;
         case 'l': showListModal(); break;
         case 'b': goBack(); break;
