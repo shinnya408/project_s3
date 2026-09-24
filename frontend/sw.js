@@ -1,27 +1,27 @@
-const CACHE_NAME = 'project_s3_v1.0.23';
+const CACHE_NAME = 'project_s3_v1.0.25';
 
-// ★修正: 相対パス(./)ではなく絶対パス(/)を指定し、キャッシュの迷子を完全に防ぐ
+// ★ Cloudflareの仕様(308リダイレクト)を回避するため、キャッシュ対象はすべて「拡張子なし」にする
 const urlsToCache = [
   '/',
-  '/exam_filter.html',
-  '/exam_history.html',
-  '/exam_options.html',
-  '/exam_player.html',
-  '/exam_result.html',
-  '/exam_review.html',
-  '/favorite_filter.html',
-  '/index.html',
-  '/login.html',
-  '/player_menu.html',
-  '/player_stats.html',
-  '/question_editor.html',
-  '/quiz.html',
-  '/reset_password.html',
-  '/sim_history.html',
-  '/sim_menu.html',
-  '/sim_player.html',
-  '/sim_stats.html',
-  '/users_management.html',
+  '/index',
+  '/login',
+  '/reset_password',
+  '/player_menu',
+  '/quiz',
+  '/exam_filter',
+  '/exam_options',
+  '/exam_player',
+  '/exam_review',
+  '/exam_result',
+  '/exam_history',
+  '/favorite_filter',
+  '/player_stats',
+  '/sim_menu',
+  '/sim_player',
+  '/sim_stats',
+  '/sim_history',
+  '/question_editor',
+  '/users_management',
   '/css/exam_config.css',
   '/css/exam_player.css',
   '/css/exam_result.css',
@@ -71,9 +71,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
+          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
         })
       );
     }).then(() => self.clients.claim())
@@ -81,62 +79,48 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // GETリクエスト以外、またはAPI通信はキャッシュを通さない
-  if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/api/')) return;
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) return;
 
-  event.respondWith(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const url = new URL(event.request.url);
-      let path = url.pathname;
-      
-      // 1. ルートアクセスは確実に index.html を返す
-      if (path === '/' || path === '') {
-        let response = await cache.match('/index.html', { ignoreSearch: true });
-        if (response) return response;
-      }
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const url = new URL(event.request.url);
+    const path = url.pathname;
 
-      // 2. そのまま（パラメータ無視）でキャッシュ検索
-      let response = await cache.match(event.request, { ignoreSearch: true });
+    // 1. まずはパスそのままでキャッシュを検索（?workbookId=1 等のパラメータは無視）
+    let response = await cache.match(path, { ignoreSearch: true });
+    if (response) return response;
+
+    // 2. もし .html 付きでリクエストされたら、外して検索
+    if (path.endsWith('.html')) {
+      response = await cache.match(path.replace(/\.html$/, ''), { ignoreSearch: true });
       if (response) return response;
+    }
 
-      // 3. クリーンURL（拡張子なし）の場合、末尾に .html を付けて探す
-      if (!path.includes('.')) {
-        response = await cache.match(path + '.html', { ignoreSearch: true });
-        if (response) return response;
-      }
+    // 3. ルートパスのフォールバック
+    if (path === '/') {
+      response = await cache.match('/index', { ignoreSearch: true });
+      if (response) return response;
+    }
 
-      // 4. .html 付きでリクエストされた場合はそのまま探す
-      if (path.endsWith('.html')) {
-         response = await cache.match(path, { ignoreSearch: true });
-         if (response) return response;
+    // 4. キャッシュに無ければネットワークへ
+    try {
+      // ★ 最重要: ブラウザの厳格なリダイレクト制限（redirect mode is not "follow"）を回避するため、
+      // 新しいリクエストオブジェクトを生成し、Cloudflareのリダイレクトに自動追従させる
+      const fetchOptions = {
+        method: event.request.method,
+        headers: event.request.headers,
+        credentials: event.request.credentials,
+        redirect: 'follow' 
+      };
+      return await fetch(event.request.url, fetchOptions);
+    } catch (error) {
+      console.warn('Network request failed, offline mode:', event.request.url);
+      // 完全オフライン時の画面遷移エラー救済
+      if (event.request.mode === 'navigate') {
+        const fallback = await cache.match('/index', { ignoreSearch: true }) || await cache.match('/', { ignoreSearch: true });
+        if (fallback) return fallback;
       }
-
-      // 5. キャッシュになければネットワークへ
-      try {
-        const networkResponse = await fetch(event.request);
-        
-        // リダイレクト時にパラメータが消えるのを防ぐ
-        if (event.request.mode === 'navigate' && networkResponse.redirected) {
-          const redirectUrl = new URL(networkResponse.url);
-          if (!redirectUrl.search && url.search) {
-             redirectUrl.search = url.search;
-          }
-          return Response.redirect(redirectUrl.toString(), 302);
-        }
-        
-        return networkResponse;
-      } catch (error) {
-        console.warn('Network request failed, attempting offline fallback:', event.request.url);
-        
-        // ★追加: 完全にオフラインで、かつ画面遷移のリクエストだった場合の究極のフォールバック
-        if (event.request.mode === 'navigate') {
-            let fallback = await cache.match('/index.html', { ignoreSearch: true });
-            if (fallback) return fallback;
-        }
-        throw error;
-      }
-    })()
-  );
+      throw error;
+    }
+  })());
 });
