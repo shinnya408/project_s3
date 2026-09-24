@@ -1,4 +1,5 @@
-const CACHE_NAME = 'project_s3_v1.0.18';
+// sw.js
+const CACHE_NAME = 'project_s3_v1.0.19'; // ★バージョンを上げてキャッシュを更新させる
 const urlsToCache = [
   './',
   './exam_filter.html',
@@ -82,18 +83,50 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. ネットワークリクエストの処理
+// 3. ネットワークリクエストの賢い処理（オフライン対応の要）
 self.addEventListener('fetch', (event) => {
-  // ★重要: バックエンドAPIへの通信はキャッシュせず、常にネットワークへ
+  // バックエンドAPIへの通信はキャッシュせず、常にネットワークへ
   if (event.request.url.includes('/api/')) {
-    return; // ブラウザのデフォルトの通信に任せる
+    return;
   }
 
-  // API以外の静的ファイルは、キャッシュを優先しつつ無ければネットワークへ
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        return response || fetch(event.request);
-      })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      // 🔍 ステップ1: パラメータ(?workbookId=等)を無視して完全一致を探す
+      let response = await cache.match(event.request, { ignoreSearch: true });
+      if (response) return response;
+
+      // 🔍 ステップ2: 拡張子省略(例: /quiz)の場合、末尾に .html を付けて探す
+      const url = new URL(event.request.url);
+      // ドメイン名が含まれる場合は pathname だけを抽出して判定する
+      let path = url.pathname;
+      if (!path.includes('.') && !path.endsWith('/')) {
+        // パスが '/' 始まりで、キャッシュキーが './' 始まりの環境差異を吸収
+        const lookupPath = '.' + path + '.html';
+        response = await cache.match(lookupPath, { ignoreSearch: true });
+        
+        // それでも無ければ絶対パス相当で再検索
+        if (!response) {
+            response = await cache.match(path + '.html', { ignoreSearch: true });
+        }
+        if (response) return response;
+      }
+
+      // 🔍 ステップ3: ルートURL (/) の場合は index.html を返す
+      if (path === '/' || path === '') {
+        response = await cache.match('./index.html', { ignoreSearch: true }) || await cache.match('/index.html', { ignoreSearch: true });
+        if (response) return response;
+      }
+
+      // 🌐 ステップ4: キャッシュに無ければネットワークへ（オンラインなら成功、オフラインなら失敗）
+      try {
+        return await fetch(event.request);
+      } catch (error) {
+        console.warn('オフラインのためネットワークリクエストに失敗しました:', event.request.url);
+        throw error;
+      }
+    })()
   );
 });
