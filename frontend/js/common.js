@@ -27,7 +27,7 @@ function toggleTheme() {
 // ==========================================
 // Service Worker (PWA) の登録
 // ==========================================
-if ('serviceWorker' in navigator) {
+/* if ('serviceWorker' in navigator) {
     // ★ パラメータ（?v=...）を外し、シンプルなパスに戻す！
     navigator.serviceWorker.register('./sw.js')
         .then(registration => {
@@ -36,7 +36,7 @@ if ('serviceWorker' in navigator) {
         .catch(err => {
             console.log('ServiceWorker registration failed: ', err);
         });
-}
+} */
 
 // トースト通知のタイマーを管理する変数
 let toastTimeout;

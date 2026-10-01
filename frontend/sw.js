@@ -1,4 +1,4 @@
-const CACHE_NAME = 'project_s3_v1.0.26';
+/* const CACHE_NAME = 'project_s3_v1.0.26';
 
 // ★ Cloudflareの仕様(308リダイレクト)を回避するため、キャッシュ対象はすべて「拡張子なし」にする
 const urlsToCache = [
@@ -123,4 +123,36 @@ self.addEventListener('fetch', (event) => {
       throw error;
     }
   })());
+}); */
+
+// sw.js (無効化・キャッシュ全削除版)
+self.addEventListener('install', (event) => {
+    // 新しいService Workerを即座に待機状態からアクティブにする
+    self.skipWaiting();
 });
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        // 既存のすべてのキャッシュを削除する
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    console.log('🗑️ 古いキャッシュを削除しました:', cacheName);
+                    return caches.delete(cacheName);
+                })
+            );
+        }).then(() => {
+            // Service Worker 自身の登録を解除する
+            self.registration.unregister();
+        }).then(() => {
+            // 即座にクライアント（ブラウザ）のコントロールを奪う
+            return self.clients.claim();
+        })
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    // キャッシュを一切使わず、すべてのリクエストをそのままネットワークへ通す
+    event.respondWith(fetch(event.request));
+});
+
