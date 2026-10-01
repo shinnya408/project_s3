@@ -1,4 +1,4 @@
-const CACHE_NAME = 'project_s3_v1.0.25';
+const CACHE_NAME = 'project_s3_v1.0.26';
 
 // ★ Cloudflareの仕様(308リダイレクト)を回避するため、キャッシュ対象はすべて「拡張子なし」にする
 const urlsToCache = [

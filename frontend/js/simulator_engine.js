@@ -118,6 +118,10 @@ const CommandTypes = {
         help: "  A.B.C.D     IP subnet mask", 
         validate: isValidSubnetMask
     },
+    WILDCARD_MASK: {
+        help: "  A.B.C.D     OSPF wildcard bits",
+        validate: isValidIpAddress // 0.0.0.3 のような形式を許容するため、IPアドレスのフォーマットチェックを使い回す
+    },
     IF_ID: { 
         help: "  IF_NAME     FastEthernet, GigabitEthernet, Port-channel, etc.", 
         validate: (val) => {
@@ -466,7 +470,7 @@ const commandSchema = [
         noAction: (device) => { delete device.state.ospf[device.currentScope].routerId; }
     },
     {
-        pattern: "network {ip:IPV4} {mask:IPV4_MASK} area {area:AREA_ID}",
+        pattern: "network {ip:IPV4} {mask:WILDCARD_MASK} area {area:AREA_ID}", // ★修正: WILDCARD_MASKに変更
         mode: "router",
         help: "Enable routing on an IP network",
         action: (device, args) => {
