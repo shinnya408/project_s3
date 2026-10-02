@@ -14,6 +14,15 @@ function isValidIpAddress(ip) {
     });
 }
 
+function isValidIpv6Prefix(val) {
+    const parts = val.split('/');
+    if (parts.length !== 2) return false;
+    const ip = parts[0];
+    const prefix = parseInt(parts[1], 10);
+    if (isNaN(prefix) || prefix < 0 || prefix > 128) return false;
+    return /^[0-9a-fA-F:]+$/.test(ip);
+}
+
 function isValidSubnetMask(mask) {
     if (!isValidIpAddress(mask)) return false;
     const binaryStr = mask.split('.')
@@ -117,6 +126,14 @@ const CommandTypes = {
     IPV4_MASK: { 
         help: "  A.B.C.D     IP subnet mask", 
         validate: isValidSubnetMask
+    },
+    IPV6: { 
+        help: "  X:X:X:X::X  IPv6 address", 
+        validate: (val) => /^[0-9a-fA-F:]+$/.test(val) 
+    },
+    IPV6_PREFIX: {
+        help: "  X:X:X:X::X/<0-128>  IPv6 prefix",
+        validate: isValidIpv6Prefix
     },
     WILDCARD_MASK: {
         help: "  A.B.C.D     OSPF wildcard bits",
@@ -283,6 +300,13 @@ const commandSchema = [
         mode: "global",
         action: (device, args) => { device.state.hostname = args.name; },
         noAction: (device) => { device.state.hostname = "Router"; }
+    },
+    {
+        pattern: "ipv6 unicast-routing",
+        mode: "global",
+        help: "Enable IPv6 routing",
+        action: (device) => { device.state.ipv6UnicastRouting = true; },
+        noAction: (device) => { device.state.ipv6UnicastRouting = false; }
     },
     {
         pattern: "vlan {id:VLAN_ID}",
@@ -546,6 +570,36 @@ const commandSchema = [
         }
     },
     {
+        pattern: "ipv6 enable",
+        mode: "if",
+        help: "Enable IPv6 on interface",
+        action: (device) => { applyToScopes(device, intf => intf.ipv6Enable = true); },
+        noAction: (device) => { applyToScopes(device, intf => intf.ipv6Enable = false); }
+    },
+    {
+        pattern: "ipv6 address {ipv6:IPV6_PREFIX}",
+        mode: "if",
+        help: "Configure IPv6 address (e.g. 2001:db8::1/64)",
+        action: (device, args) => {
+            applyToScopes(device, intf => {
+                if (!intf.ipv6Addresses) intf.ipv6Addresses = [];
+                if (!intf.ipv6Addresses.includes(args.ipv6)) intf.ipv6Addresses.push(args.ipv6);
+            });
+        },
+        noAction: (device, args) => {
+            applyToScopes(device, intf => {
+                if (intf.ipv6Addresses) intf.ipv6Addresses = intf.ipv6Addresses.filter(ip => ip !== args.ipv6);
+            });
+        }
+    },
+    {
+        pattern: "ipv6 address {ipv6:IPV6} link-local",
+        mode: "if",
+        help: "Configure IPv6 link-local address",
+        action: (device, args) => { applyToScopes(device, intf => intf.ipv6LinkLocal = args.ipv6); },
+        noAction: (device) => { applyToScopes(device, intf => delete intf.ipv6LinkLocal); }
+    },
+    {
         pattern: "switchport mode access",
         mode: "if",
         action: (device) => { applyToScopes(device, intf => intf.switchportMode = "access"); },
@@ -744,6 +798,7 @@ class VirtualDevice {
             cdpRun: false,
             lldpRun: false,
             interfaces: {},
+            ipv6UnicastRouting: false, // ★これを行に追加
             vlans: {},
             staticRoutes: {},
             ospf: {},
@@ -773,6 +828,7 @@ class VirtualDevice {
         let conf = "!\n";
         conf += `hostname ${this.state.hostname}\n!\n`;
         
+        if (this.state.ipv6UnicastRouting) conf += "ipv6 unicast-routing\n!\n";
         if (this.state.lldpRun) conf += "lldp run\n!\n";
         if (this.state.cdpRun) conf += "cdp run\n!\n";
 
@@ -798,6 +854,12 @@ class VirtualDevice {
             if (settings.accessVlan) conf += ` switchport access vlan ${settings.accessVlan}\n`;
             if (settings.ipAddress) conf += ` ip address ${settings.ipAddress} ${settings.subnetMask}\n`;
             else if (settings._explicitNoIp) conf += ` no ip address\n`;
+
+            if (settings.ipv6Enable) conf += ` ipv6 enable\n`;
+            if (settings.ipv6Addresses) {
+                settings.ipv6Addresses.forEach(ip => conf += ` ipv6 address ${ip}\n`);
+            }
+            if (settings.ipv6LinkLocal) conf += ` ipv6 address ${settings.ipv6LinkLocal} link-local\n`;
             
             // ★追加: IFのNAT, ACL, STP設定
             if (settings.ipNat) conf += ` ip nat ${settings.ipNat}\n`;
@@ -1100,6 +1162,7 @@ class VirtualDevice {
                     const exists = state.staticRoutes[key] === parts[4];
                     return isNo ? !exists : exists;
                 }
+                if (baseCond === 'ipv6 unicast-routing') return isNo ? !state.ipv6UnicastRouting : state.ipv6UnicastRouting === true;
                 // ★追加: ACL/NAT/STP のGlobal採点判定
                 if (baseCond.startsWith('access-list ')) {
                     const parts = baseCond.split(' ');
@@ -1144,6 +1207,16 @@ class VirtualDevice {
                     const parts = baseCond.split(' ');
                     const matches = (intf.ipAddress === parts[2] && intf.subnetMask === parts[3]);
                     return isNo ? !matches : matches;
+                }
+                if (baseCond === 'ipv6 enable') return isNo ? !intf.ipv6Enable : intf.ipv6Enable === true;
+                if (baseCond.startsWith('ipv6 address ') && baseCond.includes(' link-local')) {
+                    const ip = baseCond.split(' ')[2];
+                    return isNo ? intf.ipv6LinkLocal !== ip : intf.ipv6LinkLocal === ip;
+                }
+                if (baseCond.startsWith('ipv6 address ') && !baseCond.includes(' link-local')) {
+                    const ip = baseCond.split(' ')[2];
+                    const exists = intf.ipv6Addresses && intf.ipv6Addresses.includes(ip);
+                    return isNo ? !exists : exists;
                 }
                 if (baseCond === 'switchport mode access') return isNo ? intf.switchportMode !== 'access' : intf.switchportMode === 'access';
                 if (baseCond === 'switchport mode trunk') return isNo ? intf.switchportMode !== 'trunk' : intf.switchportMode === 'trunk';
