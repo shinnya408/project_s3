@@ -14,13 +14,45 @@ function isValidIpAddress(ip) {
     });
 }
 
+// ★新規追加: IPv6アドレス単体の厳密なフォーマットチェック
+function isValidIpv6Address(ip) {
+    if (!/^[0-9a-fA-F:]+$/.test(ip)) return false;
+    
+    const doubleColonMatches = ip.match(/::/g);
+    if (doubleColonMatches && doubleColonMatches.length > 1) return false;
+
+    if (ip.startsWith(':') && !ip.startsWith('::')) return false;
+    if (ip.endsWith(':') && !ip.endsWith('::')) return false;
+
+    const blocks = ip.split(':');
+    let validBlockCount = 0;
+    const hasDoubleColon = ip.includes('::');
+
+    for (let i = 0; i < blocks.length; i++) {
+        if (blocks[i] !== '') {
+            if (blocks[i].length > 4) return false; // 1ブロックは4桁の16進数まで
+            validBlockCount++;
+        }
+    }
+
+    if (hasDoubleColon) {
+        if (validBlockCount >= 8) return false; // :: があるなら実ブロックは7個以下
+    } else {
+        if (validBlockCount !== 8) return false; // :: が無いなら必ず8ブロック
+    }
+
+    return true;
+}
+
+// ★修正: 上記の厳密チェック関数を呼び出すように変更
 function isValidIpv6Prefix(val) {
     const parts = val.split('/');
     if (parts.length !== 2) return false;
     const ip = parts[0];
     const prefix = parseInt(parts[1], 10);
     if (isNaN(prefix) || prefix < 0 || prefix > 128) return false;
-    return /^[0-9a-fA-F:]+$/.test(ip);
+    
+    return isValidIpv6Address(ip);
 }
 
 function isValidSubnetMask(mask) {
@@ -129,11 +161,11 @@ const CommandTypes = {
     },
     IPV6: { 
         help: "  X:X:X:X::X  IPv6 address", 
-        validate: (val) => /^[0-9a-fA-F:]+$/.test(val) 
+        validate: isValidIpv6Address // ★直接正規表現を書くのではなく関数を呼び出す
     },
     IPV6_PREFIX: {
         help: "  X:X:X:X::X/<0-128>  IPv6 prefix",
-        validate: isValidIpv6Prefix
+        validate: isValidIpv6Prefix // 先ほど修正した関数が呼ばれる
     },
     WILDCARD_MASK: {
         help: "  A.B.C.D     OSPF wildcard bits",
