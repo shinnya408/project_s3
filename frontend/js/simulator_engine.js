@@ -14,10 +14,10 @@ function isValidIpAddress(ip) {
     });
 }
 
-// ★新規追加: IPv6アドレス単体の厳密なフォーマットチェック
 function isValidIpv6Address(ip) {
     if (!/^[0-9a-fA-F:]+$/.test(ip)) return false;
-    
+    if (ip.includes(':::')) return false;
+
     const doubleColonMatches = ip.match(/::/g);
     if (doubleColonMatches && doubleColonMatches.length > 1) return false;
 
@@ -30,21 +30,20 @@ function isValidIpv6Address(ip) {
 
     for (let i = 0; i < blocks.length; i++) {
         if (blocks[i] !== '') {
-            if (blocks[i].length > 4) return false; // 1ブロックは4桁の16進数まで
+            if (blocks[i].length > 4) return false; 
             validBlockCount++;
         }
     }
 
     if (hasDoubleColon) {
-        if (validBlockCount >= 8) return false; // :: があるなら実ブロックは7個以下
+        if (validBlockCount >= 8) return false; 
     } else {
-        if (validBlockCount !== 8) return false; // :: が無いなら必ず8ブロック
+        if (validBlockCount !== 8) return false; 
     }
 
     return true;
 }
 
-// ★修正: 上記の厳密チェック関数を呼び出すように変更
 function isValidIpv6Prefix(val) {
     const parts = val.split('/');
     if (parts.length !== 2) return false;
@@ -143,6 +142,86 @@ function parseInterfaceRangeArgs(fullStr) {
     return resultScopes.length > 0 ? resultScopes : null;
 }
 
+function parseVlanList(val) {
+    if (!val) return null;
+    if (/^[a-zA-Z]+$/.test(val.trim())) return null;
+    
+    const parts = val.split(',');
+    const vlanSet = new Set();
+    
+    for (let part of parts) {
+        part = part.trim();
+        if (!part) continue;
+        const dashIndex = part.indexOf('-');
+        if (dashIndex !== -1) {
+            const start = parseInt(part.substring(0, dashIndex).trim(), 10);
+            const end = parseInt(part.substring(dashIndex + 1).trim(), 10);
+            if (isNaN(start) || isNaN(end) || start > end || start < 1 || end > 4094) return null;
+            for (let i = start; i <= end; i++) vlanSet.add(i);
+        } else {
+            const v = parseInt(part, 10);
+            if (isNaN(v) || v < 1 || v > 4094) return null;
+            vlanSet.add(v);
+        }
+    }
+    if (vlanSet.size === 0) return null;
+    return Array.from(vlanSet).sort((a, b) => a - b);
+}
+
+function formatVlanList(vlanArray) {
+    if (vlanArray === 'all') return 'all';
+    if (vlanArray === 'none') return 'none';
+    if (!Array.isArray(vlanArray) || vlanArray.length === 0) return 'none';
+    
+    let ranges = [];
+    let start = vlanArray[0];
+    let prev = vlanArray[0];
+    
+    for (let i = 1; i <= vlanArray.length; i++) {
+        if (i < vlanArray.length && vlanArray[i] === prev + 1) {
+            prev = vlanArray[i];
+        } else {
+            if (start === prev) ranges.push(start.toString());
+            else ranges.push(`${start}-${prev}`);
+            
+            if (i < vlanArray.length) {
+                start = vlanArray[i];
+                prev = vlanArray[i];
+            }
+        }
+    }
+    return ranges.join(',');
+}
+
+function arraysEqual(a, b) {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
+function createEnumSchemas(basePattern, commandMode, options, actionCallback, noActionCallback) {
+    const schemas = options.map(opt => ({
+        pattern: `${basePattern} ${opt.keyword}`,
+        mode: commandMode,
+        help: opt.help,
+        action: (device, args) => actionCallback(device, args, opt.keyword)
+    }));
+
+    if (noActionCallback) {
+        schemas.push({
+            pattern: `no ${basePattern}`,
+            mode: commandMode,
+            help: "Negate a command or set its defaults",
+            action: noActionCallback
+        });
+    }
+    return schemas;
+}
+
 // ==========================================
 // 2. データ型の定義（自動ヘルプ・補完・バリデーション）
 // ==========================================
@@ -161,15 +240,15 @@ const CommandTypes = {
     },
     IPV6: { 
         help: "  X:X:X:X::X  IPv6 address", 
-        validate: isValidIpv6Address // ★直接正規表現を書くのではなく関数を呼び出す
+        validate: isValidIpv6Address 
     },
     IPV6_PREFIX: {
         help: "  X:X:X:X::X/<0-128>  IPv6 prefix",
-        validate: isValidIpv6Prefix // 先ほど修正した関数が呼ばれる
+        validate: isValidIpv6Prefix 
     },
     WILDCARD_MASK: {
         help: "  A.B.C.D     OSPF wildcard bits",
-        validate: isValidIpAddress // 0.0.0.3 のような形式を許容するため、IPアドレスのフォーマットチェックを使い回す
+        validate: isValidIpAddress 
     },
     IF_ID: { 
         help: "  IF_NAME     FastEthernet, GigabitEthernet, Port-channel, etc.", 
@@ -200,6 +279,11 @@ const CommandTypes = {
         help: "  <1-4094>    VLAN ID",
         validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 1 && n <= 4094; }
     },
+    VLAN_LIST: {
+        help: "  WORD        VLAN IDs of the allowed VLANs when this port is in trunking mode\n  add         add VLANs to the current list\n  all         all VLANs\n  except      all VLANs except the following\n  none        no VLANs\n  remove      remove VLANs from the current list",
+        validate: (val) => parseVlanList(val) !== null,
+        consumeRest: true 
+    },
     PROCESS_ID: {
         help: "  <1-65535>   Process ID",
         validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 1 && n <= 65535; }
@@ -220,11 +304,6 @@ const CommandTypes = {
         help: "  <1-48>      Channel group number",
         validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 1 && n <= 48; }
     },
-    CHANNEL_MODE: {
-        help: "active      Enable LACP unconditionally\nauto        Enable PAgP only if a PAgP device is detected\ndesirable   Enable PAgP unconditionally\non          Enable Etherchannel only\npassive     Enable LACP only if a LACP device is detected",
-        validate: (val) => /^(active|passive|desirable|auto|on)$/i.test(val)
-    },
-    // ★追加: ACL/NAT/STP用の型定義
     ACL_NUM: {
         help: "  <1-199>     Access list number",
         validate: (val) => { const n = parseInt(val, 10); return !isNaN(n) && n >= 1 && n <= 199; }
@@ -240,14 +319,6 @@ const CommandTypes = {
     NAT_DIR: {
         help: "  inside      Inside interface for NAT\n  outside     Outside interface for NAT",
         validate: (val) => /^(inside|outside)$/i.test(val)
-    },
-    STP_MODE: {
-        help: "  pvst        Per-Vlan spanning tree mode\n  rapid-pvst  Per-Vlan rapid spanning tree mode",
-        validate: (val) => /^(pvst|rapid-pvst)$/i.test(val)
-    },
-    STP_ROOT: {
-        help: "  primary     Configure this switch as primary root\n  secondary   Configure switch as secondary root",
-        validate: (val) => /^(primary|secondary)$/i.test(val)
     },
     STP_PRIORITY: {
         help: "  <0-61440>   bridge priority in increments of 4096",
@@ -269,7 +340,6 @@ const applyToScopes = (device, callback) => {
 // 3. コマンドスキーマ
 // ==========================================
 const commandSchema = [
-    // --- モード遷移・基本 ---
     { pattern: "enable", mode: "user", action: (d) => { d.mode = "priv"; } },
     { pattern: "disable", mode: "priv", action: (d) => { d.mode = "user"; } },
     { pattern: "configure terminal", mode: "priv", action: (d) => { d.mode = "global"; } },
@@ -282,7 +352,6 @@ const commandSchema = [
     { pattern: "end", mode: "vlan", action: (d) => { d.mode = "priv"; } },
     { pattern: "end", mode: "router", action: (d) => { d.mode = "priv"; } },
 
-    // --- 必須/対話プロンプト系 (Privileged EXEC) ---
     {
         pattern: "clear ip ospf process",
         mode: "priv",
@@ -326,7 +395,15 @@ const commandSchema = [
         }
     },
 
-    // --- グローバル設定 ---
+    // ★追加: logging console
+    {
+        pattern: "logging console",
+        mode: "global",
+        help: "Set console logging level",
+        action: (device) => { device.state.loggingConsole = true; },
+        noAction: (device) => { device.state.loggingConsole = false; }
+    },
+
     {
         pattern: "hostname {name:WORD}",
         mode: "global",
@@ -374,7 +451,6 @@ const commandSchema = [
         noAction: (device, args) => { delete device.state.ospf[args.id]; }
     },
     
-    // ★追加: ACL (Access Control List)
     {
         pattern: "no access-list {id:ACL_NUM}",
         mode: "global",
@@ -387,7 +463,6 @@ const commandSchema = [
         help: "Configure access-list rules (e.g. '10 permit 192.168.1.0 0.0.0.255' or '10 permit any')",
         action: (device, args) => {
             if (!device.state.acls[args.id]) device.state.acls[args.id] = [];
-            // 同じルールがなければ追加
             if (!device.state.acls[args.id].some(r => r.action === args.action.toLowerCase() && r.rule === args.rule)) {
                 device.state.acls[args.id].push({ action: args.action.toLowerCase(), rule: args.rule });
             }
@@ -400,7 +475,6 @@ const commandSchema = [
         }
     },
     
-    // ★追加: NAT (Network Address Translation)
     {
         pattern: "ip nat inside source static {local:IPV4} {global:IPV4}",
         mode: "global",
@@ -436,24 +510,31 @@ const commandSchema = [
         }
     },
 
-    // ★追加: STP (Spanning Tree Protocol)
-    {
-        pattern: "spanning-tree mode {mode:STP_MODE}",
-        mode: "global",
-        help: "Spanning tree operating mode",
-        action: (device, args) => { device.state.stpMode = args.mode.toLowerCase(); },
-        noAction: (device) => { delete device.state.stpMode; }
-    },
-    {
-        pattern: "spanning-tree vlan {id:VLAN_ID} root {type:STP_ROOT}",
-        mode: "global",
-        help: "Configure switch as root",
-        action: (device, args) => {
+    ...createEnumSchemas(
+        "spanning-tree mode",
+        "global",
+        [
+            { keyword: "pvst", help: "Per-Vlan spanning tree mode" },
+            { keyword: "rapid-pvst", help: "Per-Vlan rapid spanning tree mode" }
+        ],
+        (device, args, keyword) => { device.state.stpMode = keyword; },
+        (device) => { delete device.state.stpMode; }
+    ),
+
+    ...createEnumSchemas(
+        "spanning-tree vlan {id:VLAN_ID} root",
+        "global",
+        [
+            { keyword: "primary", help: "Configure this switch as primary root" },
+            { keyword: "secondary", help: "Configure switch as secondary root" }
+        ],
+        (device, args, keyword) => {
             if(!device.state.stpRoot) device.state.stpRoot = {};
-            device.state.stpRoot[args.id] = args.type.toLowerCase();
+            device.state.stpRoot[args.id] = keyword;
         },
-        noAction: (device, args) => { if(device.state.stpRoot) delete device.state.stpRoot[args.id]; }
-    },
+        (device, args) => { if(device.state.stpRoot) delete device.state.stpRoot[args.id]; }
+    ),
+
     {
         pattern: "spanning-tree vlan {id:VLAN_ID} priority {prio:STP_PRIORITY}",
         mode: "global",
@@ -517,7 +598,6 @@ const commandSchema = [
         }
     },
 
-    // --- OSPF (Router) モード ---
     {
         pattern: "router-id {ip:IPV4}",
         mode: "router",
@@ -526,7 +606,7 @@ const commandSchema = [
         noAction: (device) => { delete device.state.ospf[device.currentScope].routerId; }
     },
     {
-        pattern: "network {ip:IPV4} {mask:WILDCARD_MASK} area {area:AREA_ID}", // ★修正: WILDCARD_MASKに変更
+        pattern: "network {ip:IPV4} {mask:WILDCARD_MASK} area {area:AREA_ID}", 
         mode: "router",
         help: "Enable routing on an IP network",
         action: (device, args) => {
@@ -560,7 +640,6 @@ const commandSchema = [
         }
     },
 
-    // --- VLAN モード ---
     {
         pattern: "name {name:WORD}",
         mode: "vlan",
@@ -568,7 +647,6 @@ const commandSchema = [
         noAction: (device) => { delete device.state.vlans[device.currentScope].name; }
     },
 
-    // --- インターフェイス モード ---
     {
         pattern: "description {text:TEXT}",
         mode: "if",
@@ -631,6 +709,7 @@ const commandSchema = [
         action: (device, args) => { applyToScopes(device, intf => intf.ipv6LinkLocal = args.ipv6); },
         noAction: (device) => { applyToScopes(device, intf => delete intf.ipv6LinkLocal); }
     },
+    
     {
         pattern: "switchport mode access",
         mode: "if",
@@ -650,13 +729,180 @@ const commandSchema = [
         noAction: (device) => { applyToScopes(device, intf => delete intf.accessVlan); }
     },
     {
-        pattern: "channel-group {id:CHANNEL_GROUP} mode {mode:CHANNEL_MODE}",
+        pattern: "switchport voice vlan {id:VLAN_ID}",
         mode: "if",
-        action: (device, args) => {
-            applyToScopes(device, intf => intf.channelGroup = { id: args.id, mode: args.mode.toLowerCase() });
-        },
-        noAction: (device) => { applyToScopes(device, intf => delete intf.channelGroup); }
+        help: "Vlan for voice traffic",
+        action: (device, args) => { applyToScopes(device, intf => intf.voiceVlan = parseInt(args.id, 10)); },
+        noAction: (device) => { applyToScopes(device, intf => delete intf.voiceVlan); }
     },
+
+    ...createEnumSchemas(
+        "switchport trunk encapsulation",
+        "if",
+        [
+            { keyword: "dot1q", help: "Interface uses only 802.1q trunking encapsulation when trunking" },
+            { keyword: "isl", help: "Interface uses only ISL trunking encapsulation when trunking" },
+            { keyword: "negotiate", help: "Device will negotiate trunking encapsulation with peer on interface" }
+        ],
+        (device, args, keyword) => { applyToScopes(device, intf => intf.trunkEncapsulation = keyword); },
+        (device) => { applyToScopes(device, intf => delete intf.trunkEncapsulation); }
+    ),
+
+    {
+        pattern: "switchport trunk native vlan {id:VLAN_ID}",
+        mode: "if",
+        help: "Set trunking native characteristics when interface is in trunking mode",
+        action: (device, args) => { applyToScopes(device, intf => intf.trunkNativeVlan = parseInt(args.id, 10)); },
+        noAction: (device) => { applyToScopes(device, intf => delete intf.trunkNativeVlan); }
+    },
+
+    {
+        pattern: "switchport trunk allowed vlan {list:VLAN_LIST}",
+        mode: "if",
+        help: "Set allowed VLAN characteristics when interface is in trunking mode",
+        action: (device, args) => { 
+            const parsed = parseVlanList(args.list);
+            applyToScopes(device, intf => intf.trunkAllowedVlan = parsed); 
+        },
+        noAction: (device) => { applyToScopes(device, intf => delete intf.trunkAllowedVlan); }
+    },
+    {
+        pattern: "switchport trunk allowed vlan add {list:VLAN_LIST}",
+        mode: "if",
+        help: "add VLANs to the current list",
+        action: (device, args) => { 
+            const parsed = parseVlanList(args.list);
+            applyToScopes(device, intf => {
+                let current = intf.trunkAllowedVlan;
+                if (!Array.isArray(current)) {
+                    if (current === 'none') current = [];
+                    else if (current === undefined || current === 'all') return; 
+                }
+                const combined = new Set(current);
+                parsed.forEach(v => combined.add(v));
+                intf.trunkAllowedVlan = Array.from(combined).sort((a, b) => a - b);
+            });
+        }
+    },
+    {
+        pattern: "switchport trunk allowed vlan remove {list:VLAN_LIST}",
+        mode: "if",
+        help: "remove VLANs from the current list",
+        action: (device, args) => { 
+            const parsed = parseVlanList(args.list);
+            applyToScopes(device, intf => {
+                let current = intf.trunkAllowedVlan;
+                if (!Array.isArray(current)) {
+                    if (current === 'none') return;
+                    if (current === undefined || current === 'all') current = Array.from({length: 4094}, (_, i) => i + 1);
+                }
+                const parsedSet = new Set(parsed);
+                intf.trunkAllowedVlan = current.filter(v => !parsedSet.has(v));
+                if (intf.trunkAllowedVlan.length === 0) intf.trunkAllowedVlan = 'none';
+            });
+        }
+    },
+    {
+        pattern: "switchport trunk allowed vlan all",
+        mode: "if",
+        help: "all VLANs",
+        action: (device) => { applyToScopes(device, intf => intf.trunkAllowedVlan = 'all'); }
+    },
+    {
+        pattern: "switchport trunk allowed vlan none",
+        mode: "if",
+        help: "no VLANs",
+        action: (device) => { applyToScopes(device, intf => intf.trunkAllowedVlan = 'none'); }
+    },
+    {
+        pattern: "switchport trunk allowed vlan except {list:VLAN_LIST}",
+        mode: "if",
+        help: "all VLANs except the following",
+        action: (device, args) => { 
+            const parsed = parseVlanList(args.list);
+            applyToScopes(device, intf => {
+                const parsedSet = new Set(parsed);
+                const allVlans = Array.from({length: 4094}, (_, i) => i + 1);
+                intf.trunkAllowedVlan = allVlans.filter(v => !parsedSet.has(v));
+                if (intf.trunkAllowedVlan.length === 0) intf.trunkAllowedVlan = 'none';
+            });
+        }
+    },
+
+    {
+        pattern: "switchport nonegotiate",
+        mode: "if",
+        help: "Device will not engage in negotiation parameters on this interface",
+        action: (device) => { applyToScopes(device, intf => intf.switchportNonegotiate = true); },
+        noAction: (device) => { applyToScopes(device, intf => intf.switchportNonegotiate = false); }
+    },
+    {
+        pattern: "switchport port-security",
+        mode: "if",
+        help: "Security related command",
+        action: (device) => { applyToScopes(device, intf => intf.portSecurityEnable = true); },
+        noAction: (device) => { applyToScopes(device, intf => intf.portSecurityEnable = false); }
+    },
+    {
+        pattern: "switchport port-security maximum {max:PROCESS_ID}",
+        mode: "if",
+        help: "Max secure addresses",
+        action: (device, args) => { applyToScopes(device, intf => intf.portSecurityMax = parseInt(args.max, 10)); },
+        noAction: (device) => { applyToScopes(device, intf => delete intf.portSecurityMax); }
+    },
+    
+    ...createEnumSchemas(
+        "switchport port-security violation",
+        "if",
+        [
+            { keyword: "protect", help: "Security violation protect mode" },
+            { keyword: "restrict", help: "Security violation restrict mode" },
+            { keyword: "shutdown", help: "Security violation shutdown mode" }
+        ],
+        (device, args, keyword) => { applyToScopes(device, intf => intf.portSecurityViolation = keyword); },
+        (device) => { applyToScopes(device, intf => delete intf.portSecurityViolation); }
+    ),
+
+    {
+        pattern: "switchport port-security mac-address sticky",
+        mode: "if",
+        help: "Enable sticky MAC addressing",
+        action: (device) => { applyToScopes(device, intf => intf.portSecurityMacSticky = true); },
+        noAction: (device) => { applyToScopes(device, intf => intf.portSecurityMacSticky = false); }
+    },
+    
+    // ★修正: channel-groupコマンド入力時に、Port-channel論理インターフェイスを自動生成する
+    ...createEnumSchemas(
+        "channel-group {id:CHANNEL_GROUP} mode",
+        "if",
+        [
+            { keyword: "active", help: "Enable LACP unconditionally" },
+            { keyword: "auto", help: "Enable PAgP only if a PAgP device is detected" },
+            { keyword: "desirable", help: "Enable PAgP unconditionally" },
+            { keyword: "on", help: "Enable Etherchannel only" },
+            { keyword: "passive", help: "Enable LACP only if a LACP device is detected" }
+        ],
+        (device, args, keyword) => { 
+            applyToScopes(device, intf => intf.channelGroup = { id: args.id, mode: keyword }); 
+            
+            const poName = 'Port-channel' + args.id;
+            if (!device.registeredInterfaces.has(poName)) {
+                device.registeredInterfaces.add(poName);
+            }
+            if (!device.state.interfaces[poName]) {
+                device.state.interfaces[poName] = {};
+            }
+        },
+        null 
+    ),
+    
+    {
+        pattern: "no channel-group {id:CHANNEL_GROUP}",
+        mode: "if",
+        help: "Remove channel group",
+        action: (device, args) => { applyToScopes(device, intf => delete intf.channelGroup); }
+    },
+
     {
         pattern: "ip ospf cost {cost:OSPF_COST}",
         mode: "if",
@@ -677,7 +923,6 @@ const commandSchema = [
         noAction: (device) => { applyToScopes(device, intf => delete intf.ospfArea); }
     },
     
-    // ★追加: ACL (IF適用)
     {
         pattern: "ip access-group {acl:ACL_NUM} {dir:TRAFFIC_DIR}",
         mode: "if",
@@ -694,7 +939,6 @@ const commandSchema = [
             });
         }
     },
-    // ★追加: NAT (IF適用)
     {
         pattern: "ip nat {dir:NAT_DIR}",
         mode: "if",
@@ -702,7 +946,6 @@ const commandSchema = [
         action: (device, args) => { applyToScopes(device, intf => intf.ipNat = args.dir.toLowerCase()); },
         noAction: (device) => { applyToScopes(device, intf => delete intf.ipNat); }
     },
-    // ★追加: STP (IF適用)
     {
         pattern: "spanning-tree portfast",
         mode: "if",
@@ -737,7 +980,6 @@ const commandSchema = [
         noAction: (device) => { applyToScopes(device, intf => intf.lldpReceive = false); }
     },
 
-    // --- 確認 (show) コマンド ---
     {
         pattern: "show running-config",
         mode: "priv",
@@ -827,14 +1069,14 @@ class VirtualDevice {
         
         this.state = {
             hostname: hostname,
+            loggingConsole: true, // ★追加: 初期状態はtrue
             cdpRun: false,
             lldpRun: false,
             interfaces: {},
-            ipv6UnicastRouting: false, // ★これを行に追加
+            ipv6UnicastRouting: false, 
             vlans: {},
             staticRoutes: {},
             ospf: {},
-            // ★追加: 新規プロトコル用のステート
             acls: {},
             nat: { static: [], dynamic: [] },
             stpMode: null,
@@ -860,11 +1102,13 @@ class VirtualDevice {
         let conf = "!\n";
         conf += `hostname ${this.state.hostname}\n!\n`;
         
+        // ★追加: logging console の出力（falseの場合のみnoがつく）
+        if (this.state.loggingConsole === false) conf += "no logging console\n!\n";
+
         if (this.state.ipv6UnicastRouting) conf += "ipv6 unicast-routing\n!\n";
         if (this.state.lldpRun) conf += "lldp run\n!\n";
         if (this.state.cdpRun) conf += "cdp run\n!\n";
 
-        // ★追加: STP Global設定
         if (this.state.stpMode) conf += `spanning-tree mode ${this.state.stpMode}\n`;
         if (this.state.stpRoot) {
             for (const [v, root] of Object.entries(this.state.stpRoot)) conf += `spanning-tree vlan ${v} root ${root}\n`;
@@ -882,8 +1126,29 @@ class VirtualDevice {
         for (const [ifName, settings] of Object.entries(this.state.interfaces)) {
             conf += `interface ${ifName}\n`;
             if (settings.description) conf += ` description ${settings.description}\n`;
+            
             if (settings.switchportMode) conf += ` switchport mode ${settings.switchportMode}\n`;
+            if (settings.switchportNonegotiate) conf += ` switchport nonegotiate\n`;
             if (settings.accessVlan) conf += ` switchport access vlan ${settings.accessVlan}\n`;
+            if (settings.voiceVlan) conf += ` switchport voice vlan ${settings.voiceVlan}\n`;
+            if (settings.trunkEncapsulation) conf += ` switchport trunk encapsulation ${settings.trunkEncapsulation}\n`;
+            if (settings.trunkNativeVlan) conf += ` switchport trunk native vlan ${settings.trunkNativeVlan}\n`;
+            
+            if (settings.trunkAllowedVlan !== undefined) {
+                if (settings.trunkAllowedVlan === 'all') {
+                    conf += ` switchport trunk allowed vlan all\n`;
+                } else if (settings.trunkAllowedVlan === 'none') {
+                    conf += ` switchport trunk allowed vlan none\n`;
+                } else if (Array.isArray(settings.trunkAllowedVlan)) {
+                    conf += ` switchport trunk allowed vlan ${formatVlanList(settings.trunkAllowedVlan)}\n`;
+                }
+            }
+
+            if (settings.portSecurityEnable) conf += ` switchport port-security\n`;
+            if (settings.portSecurityMax !== undefined) conf += ` switchport port-security maximum ${settings.portSecurityMax}\n`;
+            if (settings.portSecurityViolation) conf += ` switchport port-security violation ${settings.portSecurityViolation}\n`;
+            if (settings.portSecurityMacSticky) conf += ` switchport port-security mac-address sticky\n`;
+
             if (settings.ipAddress) conf += ` ip address ${settings.ipAddress} ${settings.subnetMask}\n`;
             else if (settings._explicitNoIp) conf += ` no ip address\n`;
 
@@ -893,7 +1158,6 @@ class VirtualDevice {
             }
             if (settings.ipv6LinkLocal) conf += ` ipv6 address ${settings.ipv6LinkLocal} link-local\n`;
             
-            // ★追加: IFのNAT, ACL, STP設定
             if (settings.ipNat) conf += ` ip nat ${settings.ipNat}\n`;
             if (settings.accessGroup) {
                 if (settings.accessGroup.in) conf += ` ip access-group ${settings.accessGroup.in} in\n`;
@@ -926,7 +1190,6 @@ class VirtualDevice {
             conf += `ip route ${net} ${mask} ${nextHop}\n`;
         }
 
-        // ★追加: ACL と NAT のGlobal設定出力
         if (this.state.nat.static) {
             this.state.nat.static.forEach(n => conf += `ip nat inside source static ${n.local} ${n.global}\n`);
         }
@@ -959,9 +1222,77 @@ class VirtualDevice {
         return schemas;
     }
 
+    _resolvePrefixTokens(inputTokens, availableSchemas) {
+        let currentSchemas = availableSchemas;
+        
+        for (let i = 0; i < inputTokens.length; i++) {
+            const iToken = inputTokens[i].toLowerCase();
+            let exactMatchedSchemas = [];
+            let hasExactKeywordMatch = false;
+
+            for (const schema of currentSchemas) {
+                const pTokens = schema.pattern.split(" ");
+                if (i >= pTokens.length) {
+                    const lastPToken = pTokens[pTokens.length - 1];
+                    const lastMatch = lastPToken.match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+                    if (lastMatch && CommandTypes[lastMatch[2]].consumeRest) {
+                        exactMatchedSchemas.push(schema);
+                    }
+                    continue;
+                }
+                
+                const pToken = pTokens[i];
+                const varMatch = pToken.match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+                
+                if (varMatch) {
+                    const typeDef = CommandTypes[varMatch[2]];
+                    if (typeDef.consumeRest || typeDef.validate(inputTokens[i])) { 
+                        exactMatchedSchemas.push(schema);
+                    }
+                } else {
+                    if (pToken === iToken) { 
+                        exactMatchedSchemas.push(schema);
+                        hasExactKeywordMatch = true;
+                    }
+                }
+            }
+            
+            if (hasExactKeywordMatch) {
+                currentSchemas = exactMatchedSchemas.filter(schema => {
+                    const pTokens = schema.pattern.split(" ");
+                    if (i >= pTokens.length) return true;
+                    const pToken = pTokens[i];
+                    const isVar = pToken.startsWith('{');
+                    return isVar || pToken === iToken;
+                });
+                continue;
+            } else if (exactMatchedSchemas.length > 0) {
+                 currentSchemas = exactMatchedSchemas;
+                 continue;
+            }
+            
+            let partialMatchedSchemas = [];
+            for (const schema of currentSchemas) {
+                const pTokens = schema.pattern.split(" ");
+                if (i >= pTokens.length) continue;
+                const pToken = pTokens[i];
+                const isVar = pToken.startsWith('{');
+                if (!isVar && pToken.startsWith(iToken)) {
+                    partialMatchedSchemas.push(schema);
+                }
+            }
+            
+            if (partialMatchedSchemas.length > 0) {
+                currentSchemas = partialMatchedSchemas;
+            } else {
+                return []; 
+            }
+        }
+        return currentSchemas;
+    }
+
     getCompletion(input) {
         if (this.interactiveState) return input; 
-
         const text = input.trimStart();
         const endsWithSpace = input.endsWith(' ');
         const tokens = text.split(/\s+/).filter(t => t !== '');
@@ -969,40 +1300,33 @@ class VirtualDevice {
         if (tokens.length === 0) return input;
 
         const currentToken = tokens[tokens.length - 1].toLowerCase();
+        const prefixTokens = tokens.slice(0, -1);
+        
         const availableSchemas = this.getAvailableSchemas();
+        const validSchemas = this._resolvePrefixTokens(prefixTokens, availableSchemas);
+        
         let candidates = new Set();
-
-        for (const schema of availableSchemas) {
+        for (const schema of validSchemas) {
             const pTokens = schema.pattern.split(" ");
-            const lastPToken = pTokens[pTokens.length - 1];
-            const match = lastPToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/);
-            if (tokens.length > pTokens.length && !(match && CommandTypes[match[1]].consumeRest)) continue;
-
-            let matchUpToNow = true;
-            for (let i = 0; i < tokens.length - 1; i++) {
-                if (i >= pTokens.length) break;
-                const pToken = pTokens[i];
-                const isVar = pToken.startsWith('{');
-                if (!isVar && !pToken.startsWith(tokens[i].toLowerCase())) {
-                    matchUpToNow = false;
-                    break;
+            const targetIdx = tokens.length - 1;
+            
+            if (targetIdx >= pTokens.length) {
+                const lastMatch = pTokens[pTokens.length - 1].match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+                if (lastMatch && CommandTypes[lastMatch[2]].consumeRest) {
+                    // consumeRest は補完不要
                 }
+                continue;
             }
             
-            if (matchUpToNow && tokens.length <= pTokens.length) {
-                const targetPToken = pTokens[tokens.length - 1];
-                if (targetPToken) {
-                    const isVar = targetPToken.startsWith('{');
-                    if (isVar) {
-                        const typeName = targetPToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/)[1];
-                        if (CommandTypes[typeName].getCompletions) {
-                            const typeCands = CommandTypes[typeName].getCompletions(currentToken);
-                            typeCands.forEach(c => candidates.add(c));
-                        }
-                    } else if (targetPToken.startsWith(currentToken)) {
-                        candidates.add(targetPToken);
-                    }
+            const targetPToken = pTokens[targetIdx];
+            const varMatch = targetPToken.match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+            if (varMatch) {
+                const typeName = varMatch[2];
+                if (CommandTypes[typeName].getCompletions) {
+                    CommandTypes[typeName].getCompletions(currentToken).forEach(c => candidates.add(c));
                 }
+            } else if (targetPToken.startsWith(currentToken)) {
+                candidates.add(targetPToken);
             }
         }
 
@@ -1025,7 +1349,6 @@ class VirtualDevice {
 
     getHelp(input) {
         if (this.interactiveState) return ""; 
-
         const text = input.trimStart();
         const endsWithSpace = input.endsWith(' ');
         const tokens = text.split(/\s+/).filter(t => t !== '');
@@ -1033,52 +1356,44 @@ class VirtualDevice {
         if (tokens.length === 0) tokens.push('');
 
         const currentToken = tokens[tokens.length - 1].toLowerCase();
+        const prefixTokens = tokens.slice(0, -1);
+
         const availableSchemas = this.getAvailableSchemas();
+        const validSchemas = this._resolvePrefixTokens(prefixTokens, availableSchemas);
         
         let helpLines = new Map();
         let exactMatchSchema = null;
 
-        for (const schema of availableSchemas) {
+        for (const schema of validSchemas) {
             const pTokens = schema.pattern.split(" ");
-            const lastPToken = pTokens[pTokens.length - 1];
-            const isLastVarRest = lastPToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/) && CommandTypes[lastPToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/)[1]].consumeRest;
-            if (!isLastVarRest && tokens.length > pTokens.length + 1) continue;
-
-            let matchUpToNow = true;
-            for (let i = 0; i < tokens.length - 1; i++) {
-                if (i >= pTokens.length) break;
-                const pToken = pTokens[i];
-                const iToken = tokens[i];
-                const isVar = pToken.startsWith('{');
-                
-                if (isVar) {
-                    const typeName = pToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/)[1];
-                    if (!CommandTypes[typeName].consumeRest && !CommandTypes[typeName].validate(iToken)) matchUpToNow = false;
-                } else {
-                    if (!pToken.startsWith(iToken.toLowerCase())) matchUpToNow = false;
+            const targetIdx = tokens.length - 1;
+            
+            if (targetIdx >= pTokens.length) {
+                const lastMatch = pTokens[pTokens.length - 1].match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+                if (lastMatch && CommandTypes[lastMatch[2]].consumeRest) {
+                    if (this._matchTokensToSchema(prefixTokens, schema.pattern, true) !== null) {
+                        exactMatchSchema = schema;
+                    }
                 }
-                if (!matchUpToNow) break;
+                continue;
+            }
+            
+            if (targetIdx === pTokens.length) {
+                if (this._matchTokensToSchema(prefixTokens, schema.pattern, true) !== null) {
+                    exactMatchSchema = schema;
+                }
+                continue;
             }
 
-            if (matchUpToNow) {
-                if (tokens.length > pTokens.length) {
-                    if (endsWithSpace && !exactMatchSchema) exactMatchSchema = schema;
-                    continue;
-                }
-                
-                const targetPToken = pTokens[tokens.length - 1];
-                const isVar = targetPToken.startsWith('{');
-                
-                if (isVar) {
-                    const typeName = targetPToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/)[1];
-                    const formattedHelp = CommandTypes[typeName].help
-                        .split('\n')
-                        .map(line => '  ' + line.trimStart())
-                        .join('\n');
-                    helpLines.set(typeName, formattedHelp);
-                } else if (targetPToken.startsWith(currentToken)) {
-                    helpLines.set(targetPToken, `  ${targetPToken.padEnd(20)} ${schema.help || ''}`);
-                }
+            const targetPToken = pTokens[targetIdx];
+            const varMatch = targetPToken.match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+            
+            if (varMatch) {
+                const typeName = varMatch[2];
+                const formattedHelp = CommandTypes[typeName].help.split('\n').map(line => '  ' + line.trimStart()).join('\n');
+                helpLines.set(typeName, formattedHelp);
+            } else if (targetPToken.startsWith(currentToken)) {
+                helpLines.set(targetPToken, `  ${targetPToken.padEnd(20)} ${schema.help || ''}`);
             }
         }
 
@@ -1089,6 +1404,7 @@ class VirtualDevice {
 
         let out = "";
         Array.from(helpLines.values()).sort().forEach(line => { out += line + "\n"; });
+        if (exactMatchSchema && endsWithSpace) out += "  <cr>"; 
         return out.trimEnd();
     }
 
@@ -1104,21 +1420,34 @@ class VirtualDevice {
 
         const availableSchemas = this.getAvailableSchemas();
 
+        let exactMatches = [];
         for (const schema of availableSchemas) {
-            const parsedArgs = this._matchTokensToSchema(tokens, schema.pattern);
-            if (parsedArgs !== null) {
-                const output = schema.action(this, parsedArgs);
-                return output || "";
-            }
+            const parsedArgs = this._matchTokensToSchema(tokens, schema.pattern, true);
+            if (parsedArgs !== null) exactMatches.push({ schema, parsedArgs });
         }
+        if (exactMatches.length === 1) {
+            return exactMatches[0].schema.action(this, exactMatches[0].parsedArgs) || "";
+        }
+
+        let partialMatches = [];
+        for (const schema of availableSchemas) {
+            const parsedArgs = this._matchTokensToSchema(tokens, schema.pattern, false);
+            if (parsedArgs !== null) partialMatches.push({ schema, parsedArgs });
+        }
+        if (partialMatches.length === 1) {
+            return partialMatches[0].schema.action(this, partialMatches[0].parsedArgs) || "";
+        } else if (partialMatches.length > 1) {
+            return `% Ambiguous command:  "${input.trim()}"`;
+        }
+
         return "% Invalid input or unrecognized command";
     }
 
-    _matchTokensToSchema(inputTokens, patternStr) {
+    _matchTokensToSchema(inputTokens, patternStr, isExactSearch) {
         const patternTokens = patternStr.split(" ");
         const lastPToken = patternTokens[patternTokens.length - 1];
-        const lastMatch = lastPToken.match(/^\{[a-zA-Z]+:([A-Z_0-9]+)\}$/);
-        const hasRestType = lastMatch && CommandTypes[lastMatch[1]].consumeRest;
+        const lastMatch = lastPToken.match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
+        const hasRestType = lastMatch && CommandTypes[lastMatch[2]].consumeRest;
 
         if (!hasRestType && inputTokens.length !== patternTokens.length) return null;
         if (hasRestType && inputTokens.length < patternTokens.length) return null;
@@ -1128,7 +1457,7 @@ class VirtualDevice {
             const pToken = patternTokens[i];
             const iToken = inputTokens[i];
 
-            const varMatch = pToken.match(/^\{([a-zA-Z]+):([A-Z_0-9]+)\}$/);
+            const varMatch = pToken.match(/^\{([a-zA-Z0-9]+):([A-Z_0-9]+)\}$/);
             if (varMatch) {
                 const argName = varMatch[1];
                 const typeName = varMatch[2];
@@ -1144,7 +1473,11 @@ class VirtualDevice {
                     args[argName] = iToken;
                 }
             } else {
-                if (!pToken.startsWith(iToken.toLowerCase())) return null;
+                if (isExactSearch) {
+                    if (pToken !== iToken.toLowerCase()) return null;
+                } else {
+                    if (!pToken.startsWith(iToken.toLowerCase())) return null;
+                }
             }
         }
         return args; 
@@ -1153,9 +1486,11 @@ class VirtualDevice {
     verifyState(scopeStr, conditionStr) {
         if (!scopeStr || !conditionStr) return null;
         
-        const normCond = conditionStr.trim().toLowerCase().replace(/\s+/g, ' ');
-        const isNo = normCond.startsWith('no ');
-        const baseCond = isNo ? normCond.substring(3).trim() : normCond;
+        const originalCond = conditionStr.trim().replace(/\s+/g, ' ');
+        const isNo = originalCond.toLowerCase().startsWith('no ');
+        const baseCondOriginal = isNo ? originalCond.substring(3).trim() : originalCond;
+        
+        const baseCond = baseCondOriginal.toLowerCase();
 
         let scopeType = 'global';
         let scopeId = null;
@@ -1182,10 +1517,17 @@ class VirtualDevice {
                 if (baseCond === 'clear ip ospf process') {
                     return isNo ? !this.ospfProcessCleared : this.ospfProcessCleared === true;
                 }
-                if (baseCond.startsWith('hostname ')) {
-                    const hn = baseCond.substring(9).trim();
-                    return isNo ? state.hostname.toLowerCase() !== hn : state.hostname.toLowerCase() === hn;
+                
+                // ★追加: logging console の検証
+                if (baseCond === 'logging console') {
+                    return isNo ? state.loggingConsole === false : state.loggingConsole === true;
                 }
+
+                if (baseCond.startsWith('hostname ')) {
+                    const hn = baseCondOriginal.substring(9).trim();
+                    return isNo ? state.hostname !== hn : state.hostname === hn;
+                }
+                
                 if (baseCond === 'lldp run') return isNo ? !state.lldpRun : state.lldpRun === true;
                 if (baseCond === 'cdp run') return isNo ? !state.cdpRun : state.cdpRun === true;
                 if (baseCond.startsWith('ip route ')) {
@@ -1195,7 +1537,6 @@ class VirtualDevice {
                     return isNo ? !exists : exists;
                 }
                 if (baseCond === 'ipv6 unicast-routing') return isNo ? !state.ipv6UnicastRouting : state.ipv6UnicastRouting === true;
-                // ★追加: ACL/NAT/STP のGlobal採点判定
                 if (baseCond.startsWith('access-list ')) {
                     const parts = baseCond.split(' ');
                     const id = parts[1];
@@ -1231,9 +1572,11 @@ class VirtualDevice {
                 if (!intf) return isNo ? true : false; 
                 
                 if (baseCond.startsWith('description ')) {
-                    const matches = (intf.description || '').toLowerCase() === baseCond.substring(12).trim();
+                    const expectedDesc = baseCondOriginal.substring(12).trim();
+                    const matches = (intf.description || '') === expectedDesc;
                     return isNo ? !matches : matches;
                 }
+                
                 if (baseCond === 'shutdown') return isNo ? intf.shutdown === false : intf.shutdown === true;
                 if (baseCond.startsWith('ip address ')) {
                     const parts = baseCond.split(' ');
@@ -1241,21 +1584,78 @@ class VirtualDevice {
                     return isNo ? !matches : matches;
                 }
                 if (baseCond === 'ipv6 enable') return isNo ? !intf.ipv6Enable : intf.ipv6Enable === true;
+                
                 if (baseCond.startsWith('ipv6 address ') && baseCond.includes(' link-local')) {
                     const ip = baseCond.split(' ')[2];
-                    return isNo ? intf.ipv6LinkLocal !== ip : intf.ipv6LinkLocal === ip;
+                    const exists = !!(intf.ipv6LinkLocal && intf.ipv6LinkLocal.toLowerCase() === ip.toLowerCase());
+                    return isNo ? !exists : exists;
                 }
                 if (baseCond.startsWith('ipv6 address ') && !baseCond.includes(' link-local')) {
                     const ip = baseCond.split(' ')[2];
-                    const exists = intf.ipv6Addresses && intf.ipv6Addresses.includes(ip);
+                    const exists = !!(intf.ipv6Addresses && intf.ipv6Addresses.some(v => v.toLowerCase() === ip.toLowerCase()));
                     return isNo ? !exists : exists;
                 }
+                
                 if (baseCond === 'switchport mode access') return isNo ? intf.switchportMode !== 'access' : intf.switchportMode === 'access';
                 if (baseCond === 'switchport mode trunk') return isNo ? intf.switchportMode !== 'trunk' : intf.switchportMode === 'trunk';
                 if (baseCond.startsWith('switchport access vlan ')) {
                     const v = parseInt(baseCond.split(' ')[3], 10);
                     return isNo ? intf.accessVlan !== v : intf.accessVlan === v;
                 }
+                if (baseCond.startsWith('switchport voice vlan ')) {
+                    const v = parseInt(baseCond.split(' ')[3], 10);
+                    return isNo ? intf.voiceVlan !== v : intf.voiceVlan === v;
+                }
+                if (baseCond.startsWith('switchport trunk encapsulation ')) {
+                    const mode = baseCond.split(' ')[3];
+                    return isNo ? intf.trunkEncapsulation !== mode : intf.trunkEncapsulation === mode;
+                }
+                if (baseCond.startsWith('switchport trunk native vlan ')) {
+                    const v = parseInt(baseCond.split(' ')[4], 10);
+                    return isNo ? intf.trunkNativeVlan !== v : intf.trunkNativeVlan === v;
+                }
+                
+                if (baseCond.startsWith('switchport trunk allowed vlan ')) {
+                    const listStr = baseCond.substring(30).trim();
+                    let expectedParsed;
+                    
+                    if (listStr === 'all' || listStr === 'none') {
+                        expectedParsed = listStr;
+                    } else {
+                        if (listStr.startsWith('add ') || listStr.startsWith('remove ') || listStr.startsWith('except ')) {
+                             return isNo ? true : false;
+                        }
+                        expectedParsed = parseVlanList(listStr);
+                    }
+                    
+                    const actual = intf.trunkAllowedVlan;
+                    
+                    if (expectedParsed === 'all') {
+                         const match = (actual === 'all' || actual === undefined);
+                         return isNo ? !match : match;
+                    } else if (expectedParsed === 'none') {
+                         const match = (actual === 'none');
+                         return isNo ? !match : match;
+                    } else if (Array.isArray(expectedParsed)) {
+                         if (!Array.isArray(actual)) return isNo ? true : false;
+                         const match = arraysEqual(actual, expectedParsed);
+                         return isNo ? !match : match;
+                    }
+                    return isNo ? true : false;
+                }
+
+                if (baseCond === 'switchport nonegotiate') return isNo ? !intf.switchportNonegotiate : intf.switchportNonegotiate === true;
+                if (baseCond === 'switchport port-security') return isNo ? !intf.portSecurityEnable : intf.portSecurityEnable === true;
+                if (baseCond.startsWith('switchport port-security maximum ')) {
+                    const v = parseInt(baseCond.split(' ')[3], 10);
+                    return isNo ? intf.portSecurityMax !== v : intf.portSecurityMax === v;
+                }
+                if (baseCond.startsWith('switchport port-security violation ')) {
+                    const v = baseCond.split(' ')[3];
+                    return isNo ? intf.portSecurityViolation !== v : intf.portSecurityViolation === v;
+                }
+                if (baseCond === 'switchport port-security mac-address sticky') return isNo ? !intf.portSecurityMacSticky : intf.portSecurityMacSticky === true;
+
                 if (baseCond.startsWith('channel-group ')) {
                     const parts = baseCond.split(' ');
                     const matches = intf.channelGroup && intf.channelGroup.id === parts[1] && intf.channelGroup.mode === parts[3];
@@ -1278,7 +1678,6 @@ class VirtualDevice {
                 if (baseCond === 'lldp transmit') return isNo ? intf.lldpTransmit === false : intf.lldpTransmit === true;
                 if (baseCond === 'lldp receive') return isNo ? intf.lldpReceive === false : intf.lldpReceive === true;
                 
-                // ★追加: ACL/NAT/STP のIF採点判定
                 if (baseCond.startsWith('ip nat ')) {
                     const dir = baseCond.split(' ')[2];
                     return isNo ? intf.ipNat !== dir : intf.ipNat === dir;
@@ -1294,10 +1693,13 @@ class VirtualDevice {
             } else if (scopeType === 'vlan') {
                 const vlan = state.vlans[scopeId];
                 if (!vlan) return isNo ? true : false;
+                
                 if (baseCond.startsWith('name ')) {
-                    const matches = (vlan.name || '').toLowerCase() === baseCond.substring(5).trim();
+                    const expectedName = baseCondOriginal.substring(5).trim();
+                    const matches = (vlan.name || '') === expectedName;
                     return isNo ? !matches : matches;
                 }
+                
             } else if (scopeType === 'router') {
                 const ospf = state.ospf[scopeId];
                 if (!ospf) return isNo ? true : false;

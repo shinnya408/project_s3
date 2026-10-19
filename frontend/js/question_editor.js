@@ -1346,6 +1346,9 @@ async function deleteDdQuestion() {
 // ==========================================
 // シミュレーション問題 エディタ処理
 // ==========================================
+// ==========================================
+// シミュレーション問題 エディタ処理
+// ==========================================
 function formatInitialConfig(configText) {
     if (!configText) return '';
     const lines = configText.split('\n');
@@ -1354,9 +1357,11 @@ function formatInitialConfig(configText) {
     
     for (let line of lines) {
         const trimmed = line.trim();
-        // ★修正: [DeviceName] の行は無視してそのまま維持する
+        // ★修正: [DeviceName] だけでなく、! が来た場合も確実にグローバルモードにリセットする
         if (!trimmed || trimmed.startsWith('!') || trimmed.match(/^\[(.*?)\]$/)) {
-            if (trimmed.match(/^\[(.*?)\]$/)) currentMode = 'global'; 
+            if (trimmed.match(/^\[(.*?)\]$/) || trimmed.startsWith('!')) {
+                currentMode = 'global'; 
+            }
             formatted.push(line);
             continue;
         }
@@ -1433,19 +1438,20 @@ function restoreSimEditor(q) {
 
 let editorDevices = {};
 let activeEditorDeviceName = 'Router1';
-let editorDevice = null; 
+let editorDevice = null;
 
 function resetEditorConsole() {
     if (typeof VirtualDevice === 'undefined') return;
     
     editorDevices = {};
     const rawConfig = document.getElementById('sim-initial-config').value;
-    const lines = rawConfig.split('\n');
     
-    // ★ 修正: コンフィグ内に [機器名] のヘッダーがあるか判定
+    // ★修正: 流し込む前に必ずフォーマットをかけ、欠落しているexitなどを自動補完する
+    const formattedConfig = formatInitialConfig(rawConfig);
+    const lines = formattedConfig.split('\n');
+    
     const hasDeviceHeader = lines.some(line => line.trim().match(/^\[(.*?)\]$/));
     
-    // ヘッダーがあれば null から開始、なければ互換性のため Router1 から開始
     let currentDev = hasDeviceHeader ? null : 'Router1';
     
     lines.forEach(line => {
@@ -1453,24 +1459,19 @@ function resetEditorConsole() {
         const match = trimmed.match(/^\[(.*?)\]$/);
         if (match) currentDev = match[1];
         
-        // currentDev が決まっている場合のみ機器を生成
         if (currentDev && !editorDevices[currentDev]) {
             editorDevices[currentDev] = new VirtualDevice(currentDev);
         }
     });
     
-    // コンフィグが完全に空っぽの場合のみ、デフォルトで Router1 を作成
     if (Object.keys(editorDevices).length === 0) {
         editorDevices['Router1'] = new VirtualDevice('Router1');
     }
     
-    // ★追加: コンフィグを流し込む前に、全機器を強制的にグローバルモードにする
     Object.values(editorDevices).forEach(d => { d.mode = "global"; d.currentScope = "global"; });
 
-    // セレクトボックスの更新
     const select = document.getElementById('sim-console-device-select');
     if (select) {
-        // ... (既存のセレクトボックス更新処理そのまま) ...
         const currentVal = select.value;
         select.innerHTML = '';
         Object.keys(editorDevices).forEach(devName => {
@@ -1484,26 +1485,28 @@ function resetEditorConsole() {
         activeEditorDeviceName = select.value;
     }
 
-    // コンフィグの流し込み
     currentDev = hasDeviceHeader ? null : 'Router1';
     lines.forEach(line => {
         const trimmed = line.trim();
         const match = trimmed.match(/^\[(.*?)\]$/);
         if (match) {
             currentDev = match[1];
-        } else if (currentDev && trimmed && !trimmed.startsWith('!')) {
+        } else if (trimmed.startsWith('!')) {
+            // ★修正: コンフィグ上で ! が現れたら、シミュレータエンジン側も強制的にグローバルモードにリセットする
+            if (currentDev && editorDevices[currentDev]) {
+                editorDevices[currentDev].mode = 'global';
+                editorDevices[currentDev].currentScope = 'global';
+            }
+        } else if (currentDev && trimmed) {
             editorDevices[currentDev].processCommand(trimmed);
         }
     });
     
-    // ★追加: 流し込みが終わったら、全機器をユーザーモードに戻す
     Object.values(editorDevices).forEach(d => { 
         d.mode = "user"; 
         d.currentScope = "global"; 
-        d.isInitialized = true; // ★ここへ移動！
+        d.isInitialized = true; 
     });
-    
-    editorDevice = editorDevices[activeEditorDeviceName];
     
     editorDevice = editorDevices[activeEditorDeviceName];
     

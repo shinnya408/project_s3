@@ -510,21 +510,26 @@ function evaluateRunningConfig() {
 function checkRuleCondition(device, scope, conditionStr) {
     if (!device) return false;
 
+    // 従来の小文字化ベースの文字列（後方互換・フォールバック用）
     const normalize = (str) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
     const expectedCond = normalize(conditionStr);
+    
+    // ★追加: オリジナルの大文字・小文字を保持した文字列（V3エンジン用）
+    const originalCond = (conditionStr || '').trim().replace(/\s+/g, ' ');
 
     if (expectedCond === 'copy running-config startup-config' || expectedCond === 'copy run start') {
         return device.startupConfigSaved === true;
     }
 
-    // ★追加: V2エンジンのデータモデル直接検証機能を優先利用
+    // ★追加: V2/V3エンジンのデータモデル直接検証機能を優先利用
     if (typeof device.verifyState === 'function') {
-        const isVerified = device.verifyState(scope, expectedCond);
-        // V2エンジンが処理できた場合 (null以外) はその結果を採用
+        // ★修正: 小文字化された expectedCond ではなく、大文字小文字を保持した originalCond を渡す
+        const isVerified = device.verifyState(scope, originalCond);
+        // エンジンが処理できた場合 (null以外) はその結果を採用
         if (isVerified !== null) return isVerified;
     }
 
-    // --- ここから下は、V2未登録コマンドのための安全なフォールバック（旧テキスト検索） ---
+    // --- ここから下は、未登録コマンドのための安全なフォールバック（旧テキスト検索） ---
     const configText = device.generateRunningConfig();
     if (!configText) return false;
 
