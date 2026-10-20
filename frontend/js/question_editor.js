@@ -12,6 +12,16 @@ let currentEditingQuestionId = null; // ★追加: 現在編集中の問題ID
 let commandHistory = [];
 let historyIndex = -1;
 
+// --- 一括選択 UI 用のステート変数 ---
+let lastCheckedCb = null;
+let isDraggingCb = false;
+let dragTargetCheckedState = false;
+
+// 画面のどこでマウスを離してもドラッグ状態を解除する
+window.addEventListener('mouseup', () => {
+    isDraggingCb = false;
+});
+
 // ★追加: 画面ブロック用のローディング表示・非表示関数
 function showEditorLoading() {
     let overlay = document.getElementById('editor-loading-overlay');
@@ -1014,14 +1024,68 @@ function renderCategoryTargetList() {
     sortedQuestions.forEach(q => {
         const div = document.createElement('div');
         div.className = 'checkbox-list-item';
+        // クリック・なぞり判定を広げるためのスタイル調整
+        div.style.padding = '8px';
+        div.style.borderBottom = '1px solid var(--border-color, #e2e8f0)';
+        div.style.cursor = 'pointer';
+        
         const snippet = q.question.length > 20 ? q.question.substring(0, 20) + '...' : q.question;
         const catStr = q.categoryMajorId ? ` [大: ${getCatName(q.categoryMajorId)}]` : '';
+        const isUncategorized = (!q.categoryMajorId && !q.categoryMediumId && !q.categoryMinorId) ? 'true' : 'false';
 
+        // pointer-events: none を設定し、イベントをすべて親要素(div)で受け取るようにする
         div.innerHTML = `
-            <input type="checkbox" class="category-target-cb" value="${q.id}" id="cb-${q.id}">
-            <label for="cb-${q.id}" style="cursor:pointer;">ID:${q.id}${catStr} - ${snippet}</label>
+            <input type="checkbox" class="category-target-cb" value="${q.id}" id="cb-${q.id}" data-uncategorized="${isUncategorized}" style="pointer-events: none;">
+            <span style="pointer-events: none; margin-left: 8px;">ID:${q.id}${catStr} - ${snippet}</span>
         `;
         list.appendChild(div);
+    });
+
+    // --- 案1(Shift+Click) & 案3(なぞり選択) のイベントリスナー登録 ---
+    const checkboxes = Array.from(list.querySelectorAll('.category-target-cb'));
+    const listItems = list.querySelectorAll('.checkbox-list-item');
+
+    listItems.forEach((item, index) => {
+        const cb = checkboxes[index];
+
+        item.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // テキスト選択を防止
+            
+            // 案1: Shift + クリックによる範囲一括選択
+            if (e.shiftKey && lastCheckedCb) {
+                const start = checkboxes.indexOf(lastCheckedCb);
+                const end = index;
+                const min = Math.min(start, end);
+                const max = Math.max(start, end);
+                const targetState = lastCheckedCb.checked;
+                for (let i = min; i <= max; i++) {
+                    checkboxes[i].checked = targetState;
+                }
+                return;
+            }
+
+            // 案3: ドラッグ（なぞり）選択の起点
+            isDraggingCb = true;
+            dragTargetCheckedState = !cb.checked; // 現在の状態を反転
+            cb.checked = dragTargetCheckedState;
+            lastCheckedCb = cb;
+        });
+
+        item.addEventListener('mouseenter', () => {
+            // ドラッグ中に項目を通過した際に状態を同期
+            if (isDraggingCb) {
+                cb.checked = dragTargetCheckedState;
+                lastCheckedCb = cb;
+            }
+        });
+    });
+}
+
+// 案2: 未設定のみ選択ボタンの処理
+function selectUncategorized() {
+    document.querySelectorAll('.category-target-cb').forEach(cb => {
+        // 大・中・小すべて未設定の項目のみチェックを入れる
+        cb.checked = cb.getAttribute('data-uncategorized') === 'true';
     });
 }
 

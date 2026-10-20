@@ -217,9 +217,12 @@
                     <h3>対象問題の選択</h3>
                     <button class="btn btn-outline" onclick="selectAllForCategory(true)">すべて選択</button>
                     <button class="btn btn-outline" onclick="selectAllForCategory(false)" style="margin-left:5px;">選択解除</button>
+                    <!-- 案2: 未設定のみ選択ボタン -->
+                    <button class="btn btn-outline" onclick="selectUncategorized()" style="margin-left:5px; border-color: #f59e0b; color: #d97706;">未設定のみ選択</button>
                 </div>
                 
-                <div class="info-box" style="max-height: 300px; overflow-y: auto;" id="category-target-list">
+                <!-- 案3: なぞり選択時のテキストハイライトを防止する user-select: none を追加 -->
+                <div class="info-box" style="max-height: 300px; overflow-y: auto; user-select: none;" id="category-target-list">
                     <p style="color: var(--format-text);">※左上で問題集を選択してください</p>
                 </div>
 
