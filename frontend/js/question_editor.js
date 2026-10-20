@@ -45,6 +45,9 @@ function hideEditorLoading() {
 // ==========================================
 async function internalizeImageUrl(url) {
     if (!url) return url;
+
+    url = convertGoogleDriveUrl(url);
+
     if (!url.startsWith('http')) return url; // base64や相対パスはそのまま
     
     // 自身のサーバーのURLなら何もしない（すでに内部保存済み）
@@ -68,6 +71,25 @@ async function internalizeImageUrl(url) {
         console.warn("画像内部化エラー", e);
     }
     return url; // 失敗したら元の外部URLをそのまま使う
+}
+
+// Google Driveの共有リンクを直リンクに変換する汎用関数
+function convertGoogleDriveUrl(url) {
+    if (!url) return url;
+
+    // パターン1: /file/d/ の形式 (フォーマット1, 2に対応)
+    const fileDMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileDMatch) {
+        return `https://drive.google.com/uc?export=download&id=${fileDMatch[1]}`;
+    }
+
+    // パターン2: id= の形式 (フォーマット3に対応)
+    const idMatch = url.match(/drive\.google\.com\/.*?[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idMatch) {
+        return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+    }
+
+    return url;
 }
 
 // 登録データのすべてのURLを走査して内部化する共通関数
@@ -564,7 +586,13 @@ function getSortedQuestions() {
 }
 
 function previewImage(inputId, previewId) {
-    const url = document.getElementById(inputId).value;
+    const inputEl = document.getElementById(inputId);
+    if (!inputEl) return;
+    
+    // 入力値を変換関数に通す
+    let url = convertGoogleDriveUrl(inputEl.value.trim());
+    inputEl.value = url; // 変換されたら入力欄も更新
+
     const img = document.getElementById(previewId);
     if (!img) return;
     img.style.display = (url && url.startsWith('http')) ? 'block' : 'none';
