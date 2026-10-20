@@ -77,16 +77,18 @@ async function internalizeImageUrl(url) {
 function convertGoogleDriveUrl(url) {
     if (!url) return url;
 
-    // パターン1: /file/d/ の形式 (フォーマット1, 2に対応)
+    // パターン1: /file/d/ の形式
     const fileDMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (fileDMatch) {
-        return `https://drive.google.com/uc?export=download&id=${fileDMatch[1]}`;
+        // ★修正: ダウンロード画面を回避するため、サムネイル取得APIを使用する
+        return `https://drive.google.com/thumbnail?id=${fileDMatch[1]}&sz=w1000`;
     }
 
-    // パターン2: id= の形式 (フォーマット3に対応)
+    // パターン2: id= の形式
     const idMatch = url.match(/drive\.google\.com\/.*?[?&]id=([a-zA-Z0-9_-]+)/);
     if (idMatch) {
-        return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+        // ★修正: ダウンロード画面を回避するため、サムネイル取得APIを使用する
+        return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
     }
 
     return url;
