@@ -54,8 +54,9 @@
                 <h3>登録済み問題一覧</h3>
             </div>
             
-            <div class="form-group" style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <input type="text" id="search-id-input" placeholder="🔍 IDで検索 (例: 12)" oninput="renderQuestionList()" style="background-color: var(--bg-color); flex: 1;">
+            <!-- ★修正: flex-wrapを追加し、表示モードのselect要素を追加 -->
+            <div class="form-group" style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                <input type="text" id="search-id-input" placeholder="🔍 IDで検索 (例: 12)" oninput="renderQuestionList()" style="background-color: var(--bg-color); flex: 1; min-width: 120px;">
                 
                 <select id="sort-select" onchange="renderQuestionList()" style="width: auto; background-color: var(--bg-color);">
                     <option value="id-asc">ID順 (昇順)</option>
@@ -63,6 +64,14 @@
                     <option value="major-asc">大項目順</option>
                     <option value="medium-asc">中項目順</option>
                     <option value="minor-asc">小項目順</option>
+                </select>
+
+                <!-- ★追加: カテゴリの表示切り替え -->
+                <select id="cat-display-mode" onchange="renderQuestionList(); renderCategoryTargetList();" style="width: auto; background-color: var(--bg-color);">
+                    <option value="major">表示: 大項目のみ</option>
+                    <option value="medium">表示: 中項目のみ</option>
+                    <option value="minor">表示: 小項目のみ</option>
+                    <option value="all">表示: すべて</option>
                 </select>
             </div>
 

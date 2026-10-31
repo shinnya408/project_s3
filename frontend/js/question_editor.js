@@ -97,24 +97,44 @@ function convertGoogleDriveUrl(url) {
 // 登録データのすべてのURLを走査して内部化する共通関数
 async function internalizeAllUrls(requestData) {
     if (Array.isArray(requestData)) {
-        for (let req of requestData) {
-            if (req.questionImageUrl) req.questionImageUrl = await internalizeImageUrl(req.questionImageUrl);
-            if (req.explanationImageUrl) req.explanationImageUrl = await internalizeImageUrl(req.explanationImageUrl);
+        // ★修正: for...of (直列) をやめ、Promise.all で全問題を一気に並列処理する
+        await Promise.all(requestData.map(async (req) => {
+            const promises = [];
+            
+            if (req.questionImageUrl) {
+                promises.push(internalizeImageUrl(req.questionImageUrl).then(res => req.questionImageUrl = res));
+            }
+            if (req.explanationImageUrl) {
+                promises.push(internalizeImageUrl(req.explanationImageUrl).then(res => req.explanationImageUrl = res));
+            }
             if (req.options) {
                 for (let opt of req.options) {
-                    if (opt.imageUrl) opt.imageUrl = await internalizeImageUrl(opt.imageUrl);
+                    if (opt.imageUrl) {
+                        promises.push(internalizeImageUrl(opt.imageUrl).then(res => opt.imageUrl = res));
+                    }
+                }
+            }
+            // 1問の中のURL処理をすべて同時に完了させる
+            await Promise.all(promises);
+        }));
+    } else {
+        let req = requestData;
+        const promises = [];
+        
+        if (req.questionImageUrl) {
+            promises.push(internalizeImageUrl(req.questionImageUrl).then(res => req.questionImageUrl = res));
+        }
+        if (req.explanationImageUrl) {
+            promises.push(internalizeImageUrl(req.explanationImageUrl).then(res => req.explanationImageUrl = res));
+        }
+        if (req.dragItems) {
+            for (let item of req.dragItems) {
+                if (item.imageUrl) {
+                    promises.push(internalizeImageUrl(item.imageUrl).then(res => item.imageUrl = res));
                 }
             }
         }
-    } else {
-        let req = requestData;
-        if (req.questionImageUrl) req.questionImageUrl = await internalizeImageUrl(req.questionImageUrl);
-        if (req.explanationImageUrl) req.explanationImageUrl = await internalizeImageUrl(req.explanationImageUrl);
-        if (req.dragItems) {
-            for (let item of req.dragItems) {
-                if (item.imageUrl) item.imageUrl = await internalizeImageUrl(item.imageUrl);
-            }
-        }
+        await Promise.all(promises);
     }
     return requestData;
 }
@@ -441,7 +461,34 @@ async function loadQuestions() {
     }
 }
 
-// ★上書き: リスト描画時にハイライト色をつける
+function buildCategoryDisplayString(q) {
+    const mode = document.getElementById('cat-display-mode')?.value || 'major';
+    
+    const getCatName = (catId) => {
+        if (!catId) return '';
+        const cat = currentCategories.find(c => c.id === catId);
+        return cat ? cat.name : '未設定';
+    };
+
+    let str = '';
+    if (mode === 'major' && q.categoryMajorId) {
+        str = `大: ${getCatName(q.categoryMajorId)}`;
+    } else if (mode === 'medium' && q.categoryMediumId) {
+        str = `中: ${getCatName(q.categoryMediumId)}`;
+    } else if (mode === 'minor' && q.categoryMinorId) {
+        str = `小: ${getCatName(q.categoryMinorId)}`;
+    } else if (mode === 'all') {
+        const arr = [];
+        if (q.categoryMajorId) arr.push(`大: ${getCatName(q.categoryMajorId)}`);
+        if (q.categoryMediumId) arr.push(`中: ${getCatName(q.categoryMediumId)}`);
+        if (q.categoryMinorId) arr.push(`小: ${getCatName(q.categoryMinorId)}`);
+        str = arr.join(' / ');
+    }
+    
+    return str ? ` [${str}]` : '';
+}
+
+// ★上書き: 左サイドバーのリスト描画
 function renderQuestionList() {
     const listEl = document.getElementById('question-list');
     if (!listEl) return;
@@ -456,7 +503,6 @@ function renderQuestionList() {
         div.style.borderBottom = '1px solid var(--border-color, #e2e8f0)'; 
         div.style.cursor = 'pointer';
 
-        // ★追加: 選択中の問題なら背景色と左線を変更
         if (q.id === currentEditingQuestionId) {
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             div.style.backgroundColor = isDark ? '#1e3a8a' : '#e0f2fe';
@@ -468,9 +514,12 @@ function renderQuestionList() {
         else if (q.type === 'dd') badgeHtml = `<span style="background-color: #ede9fe; color: #7c3aed; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 8px; font-weight: bold;">D&D</span>`;
         else if (q.type === 'sim') badgeHtml = `<span style="background-color: #fef08a; color: #a16207; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 8px; font-weight: bold;">Sim</span>`;
 
+        // ★修正: カテゴリ文字列を取得して追記
+        const catStr = buildCategoryDisplayString(q);
+
         div.innerHTML = `
-            <div style="font-size: 0.85em; color: var(--format-text, #64748b); margin-bottom: 6px; display: flex; align-items: center;">
-                ${badgeHtml}<span>ID:${q.id}</span>
+            <div style="font-size: 0.85em; color: var(--format-text, #64748b); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap;">
+                ${badgeHtml}<span>ID:${q.id}${catStr}</span>
             </div>
             <div style="font-size: 0.95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 ${q.question || '（問題文なし）'}
@@ -1036,8 +1085,11 @@ function savePasteBulk() {
     sendQuestionsToBackend(requestData);
 }
 
+
+// ★上書き: 「項目の一括設定」タブ内のリスト描画
 function renderCategoryTargetList() {
     const list = document.getElementById('category-target-list');
+    if (!list) return;
     list.innerHTML = '';
     const sortedQuestions = getSortedQuestions();
 
@@ -1045,25 +1097,21 @@ function renderCategoryTargetList() {
         list.innerHTML = '<p style="color: var(--format-text);">問題がありません。</p>';
         return;
     }
-    
-    const getCatName = (catId) => {
-        const cat = currentCategories.find(c => c.id === catId);
-        return cat ? cat.name : '未設定';
-    };
 
     sortedQuestions.forEach(q => {
         const div = document.createElement('div');
         div.className = 'checkbox-list-item';
-        // クリック・なぞり判定を広げるためのスタイル調整
         div.style.padding = '8px';
         div.style.borderBottom = '1px solid var(--border-color, #e2e8f0)';
         div.style.cursor = 'pointer';
         
         const snippet = q.question.length > 20 ? q.question.substring(0, 20) + '...' : q.question;
-        const catStr = q.categoryMajorId ? ` [大: ${getCatName(q.categoryMajorId)}]` : '';
+        
+        // ★修正: カテゴリ文字列を取得して追記
+        const catStr = buildCategoryDisplayString(q);
+        
         const isUncategorized = (!q.categoryMajorId && !q.categoryMediumId && !q.categoryMinorId) ? 'true' : 'false';
 
-        // pointer-events: none を設定し、イベントをすべて親要素(div)で受け取るようにする
         div.innerHTML = `
             <input type="checkbox" class="category-target-cb" value="${q.id}" id="cb-${q.id}" data-uncategorized="${isUncategorized}" style="pointer-events: none;">
             <span style="pointer-events: none; margin-left: 8px;">ID:${q.id}${catStr} - ${snippet}</span>
@@ -1071,7 +1119,6 @@ function renderCategoryTargetList() {
         list.appendChild(div);
     });
 
-    // --- 案1(Shift+Click) & 案3(なぞり選択) のイベントリスナー登録 ---
     const checkboxes = Array.from(list.querySelectorAll('.category-target-cb'));
     const listItems = list.querySelectorAll('.checkbox-list-item');
 
@@ -1079,9 +1126,8 @@ function renderCategoryTargetList() {
         const cb = checkboxes[index];
 
         item.addEventListener('mousedown', (e) => {
-            e.preventDefault(); // テキスト選択を防止
+            e.preventDefault(); 
             
-            // 案1: Shift + クリックによる範囲一括選択
             if (e.shiftKey && lastCheckedCb) {
                 const start = checkboxes.indexOf(lastCheckedCb);
                 const end = index;
@@ -1094,15 +1140,13 @@ function renderCategoryTargetList() {
                 return;
             }
 
-            // 案3: ドラッグ（なぞり）選択の起点
             isDraggingCb = true;
-            dragTargetCheckedState = !cb.checked; // 現在の状態を反転
+            dragTargetCheckedState = !cb.checked;
             cb.checked = dragTargetCheckedState;
             lastCheckedCb = cb;
         });
 
         item.addEventListener('mouseenter', () => {
-            // ドラッグ中に項目を通過した際に状態を同期
             if (isDraggingCb) {
                 cb.checked = dragTargetCheckedState;
                 lastCheckedCb = cb;

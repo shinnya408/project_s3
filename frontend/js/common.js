@@ -115,3 +115,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 500);
     }
 });
+
+// --- 画像拡大（ズーム）機能 ---
+window.openImageZoom = function(imgSrc) {
+    if (!imgSrc) return;
+    const modal = document.getElementById('image-zoom-modal');
+    const zoomedImg = document.getElementById('zoomed-image');
+    if (modal && zoomedImg) {
+        zoomedImg.src = imgSrc;
+        modal.classList.remove('hidden');
+    }
+};
+
+window.closeImageZoom = function() {
+    const modal = document.getElementById('image-zoom-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.getElementById('zoomed-image').src = ""; // 中身をクリア
+    }
+};

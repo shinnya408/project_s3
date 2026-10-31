@@ -8,6 +8,7 @@ let remainingSeconds = 0;
 let timerInterval = null;
 let timeoutAction = 'force_end'; 
 let globalMemo = ""; 
+let isUnlimitedTime = false; // ★追加: 時間無制限フラグ
 
 const SAVE_KEY = `exam_progress_${workbookId}`; 
 
@@ -176,12 +177,14 @@ async function initFreshExam() {
     });
 
     timeoutAction = optionConfig.timeoutAction;
-    remainingSeconds = optionConfig.timeLimitMinutes > 0 ? optionConfig.timeLimitMinutes * 60 : 0;
+    isUnlimitedTime = (!optionConfig.timeLimitMinutes || optionConfig.timeLimitMinutes <= 0); // ★追加
+    remainingSeconds = isUnlimitedTime ? 0 : optionConfig.timeLimitMinutes * 60; // ★修正
     
     startTimer();
     showQuestion(0);
 }
 
+// --- 修正 2: restoreExam() (145行目付近) ---
 function restoreExam(data) {
     examQuestions = data.examQuestions;
     userAnswers = data.userAnswers;
@@ -189,12 +192,16 @@ function restoreExam(data) {
     remainingSeconds = data.remainingSeconds;
     timeoutAction = data.timeoutAction;
     globalMemo = data.globalMemo || ""; 
+    categoryMaster = data.categoryMaster || [];
+    isUnlimitedTime = data.isUnlimitedTime !== undefined ? data.isUnlimitedTime : (data.remainingSeconds <= 0); // ★追加
     startTimer();
     showQuestion(currentIndex);
 }
 
+// --- 修正 3: saveProgress() (156行目付近) ---
 function saveProgress() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ examQuestions, userAnswers, currentIndex, remainingSeconds, timeoutAction, globalMemo }));
+    // ★ isUnlimitedTime を保存対象に追加
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ examQuestions, userAnswers, currentIndex, remainingSeconds, timeoutAction, globalMemo, categoryMaster, isUnlimitedTime }));
     const ind = document.getElementById('save-indicator');
     ind.style.opacity = '1';
     setTimeout(() => { ind.style.opacity = '0'; }, 1000);
@@ -203,12 +210,15 @@ function saveProgress() {
 function startTimer() {
     updateTimerDisplay();
     timerInterval = setInterval(() => {
-        if (remainingSeconds > 0) remainingSeconds--;
+        if (!isUnlimitedTime && remainingSeconds > 0) remainingSeconds--; // ★修正: 無制限以外なら減らす
         updateTimerDisplay();
+        
         if (userAnswers[currentIndex]) userAnswers[currentIndex].timeSpent += 1;
         if (remainingSeconds % 5 === 0) saveProgress();
-        if (remainingSeconds === 60) document.getElementById('timer-display').classList.add('timer-warning');
-        if (remainingSeconds <= 0 && timeoutAction === 'force_end') {
+        if (!isUnlimitedTime && remainingSeconds === 60) document.getElementById('timer-display').classList.add('timer-warning');
+        
+        // ★修正: 時間無制限でない場合のみ「時間切れ」判定を行う
+        if (!isUnlimitedTime && remainingSeconds <= 0 && timeoutAction === 'force_end') {
             clearInterval(timerInterval);
             document.getElementById('timer-display').innerText = '⏳ 00:00:00';
             alert('時間切れです！模試を強制終了します。');
@@ -218,7 +228,8 @@ function startTimer() {
 }
 
 function updateTimerDisplay() {
-    if (remainingSeconds <= 0 && timeoutAction !== 'force_end') {
+    // ★修正: 無制限フラグを見て表示を切り替える
+    if (isUnlimitedTime) {
         document.getElementById('timer-display').innerText = '⏳ 無制限';
         return;
     }

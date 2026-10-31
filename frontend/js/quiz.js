@@ -128,7 +128,7 @@ function showQuestion(index) {
 
     document.getElementById('progress-text').innerText = `${index + 1} / ${currentQuestions.length}`;
     document.getElementById('q-id-badge').innerText = `ID: ${q.id} (${q.format === 'mcq' ? '四択' : 'D&D'})`;
-    document.getElementById('q-category-badge').innerText = q.categoryMajorId ? `📁 ${getCategoryName(q.categoryMajorId)}` : '未分類';
+    document.getElementById('q-category-badge').innerText = getFullCategoryPath(q);
     
     document.getElementById('q-text').style.whiteSpace = 'pre-wrap';
     document.getElementById('q-text').innerText = q.question;
@@ -382,6 +382,7 @@ function showListModal() {
         const majorName = majorId === 'unclassified' ? '未分類 (カテゴリなし)' : getCategoryName(parseInt(majorId));
         const majorNode = tree[majorId];
         
+        // ★修正: <details open ...> から open を削除
         finalHtml += `
         <details style="margin-bottom: 10px; background: rgba(59, 130, 246, 0.05); border-radius: 8px; border: 1px solid var(--border);">
             <summary style="padding: 10px; font-weight: bold; cursor: pointer; outline: none; font-size: 1.05em;">📁 ${majorName}</summary>
@@ -393,6 +394,7 @@ function showListModal() {
             const mediumName = getCategoryName(parseInt(mediumId));
             const mediumNode = majorNode.subs[mediumId];
             
+            // ★修正: open を削除
             finalHtml += `
             <details style="margin-top: 8px; border-left: 2px dashed var(--border); padding-left: 10px;">
                 <summary style="padding: 5px; font-weight: bold; cursor: pointer; outline: none; color: var(--text-main);">📂 ${mediumName}</summary>
@@ -404,6 +406,7 @@ function showListModal() {
                 const minorName = getCategoryName(parseInt(minorId));
                 const minorNode = mediumNode.subs[minorId];
                 
+                // ★修正: open を削除
                 finalHtml += `
                 <details style="margin-top: 5px; border-left: 2px dashed var(--border); padding-left: 10px;">
                     <summary style="padding: 5px; font-weight: bold; cursor: pointer; outline: none; color: var(--text-sub);">📄 ${minorName}</summary>
@@ -575,7 +578,7 @@ function renderDdPlayer(q, playArea) {
         const text = item.text || item.content || item.name || '';
         const safeText = text.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
         let itemHtml = `<div id="drag-item-${index}" class="dd-drag-item" draggable="true" data-correct-zone="${correctZone}" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 15px; cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;">`;
-        if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;">`;
+        if (item.imageUrl) itemHtml += `<img src="${item.imageUrl}" style="max-height: 50px; display: block; margin-bottom: 5px;" onclick="openImageZoom(this.src)">`;
         itemHtml += `<span style="white-space: pre-wrap;">${safeText}</span></div>`;
         sourceArea.insertAdjacentHTML('beforeend', itemHtml);
     });
@@ -762,6 +765,21 @@ document.addEventListener('keydown', (e) => {
         selectOptionDirectly(num);
     }
 });
+
+// --- 追加: カテゴリのフルパスを取得する関数 (quiz.js の適当な場所に追加) ---
+function getFullCategoryPath(q) {
+    let path = '';
+    if (q.categoryMajorId) {
+        path += getCategoryName(q.categoryMajorId);
+        if (q.categoryMediumId) {
+            path += ' > ' + getCategoryName(q.categoryMediumId);
+            if (q.categoryMinorId) {
+                path += ' > ' + getCategoryName(q.categoryMinorId);
+            }
+        }
+    }
+    return path ? `📁 ${path}` : '未分類';
+}
 
 function moveOptionFocus(direction) {
     if (document.getElementById('btn-submit').disabled) return; 
