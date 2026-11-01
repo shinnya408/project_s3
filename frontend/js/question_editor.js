@@ -73,6 +73,35 @@ async function internalizeImageUrl(url) {
     return url; // 失敗したら元の外部URLをそのまま使う
 }
 
+// ★追加: 選択された表示モードに従ってカテゴリ文字列を生成する関数
+function getCategoryDisplayName(q) {
+    const modeEl = document.getElementById('cat-display-mode');
+    const mode = modeEl ? modeEl.value : 'major';
+    
+    const getName = (id) => {
+        if (!id) return '';
+        const cat = currentCategories.find(c => c.id === id);
+        return cat ? cat.name : '未設定';
+    };
+
+    let str = '';
+    if (mode === 'major' && q.categoryMajorId) {
+        str = `大: ${getName(q.categoryMajorId)}`;
+    } else if (mode === 'medium' && q.categoryMediumId) {
+        str = `中: ${getName(q.categoryMediumId)}`;
+    } else if (mode === 'minor' && q.categoryMinorId) {
+        str = `小: ${getName(q.categoryMinorId)}`;
+    } else if (mode === 'all') {
+        const arr = [];
+        if (q.categoryMajorId) arr.push(`大: ${getName(q.categoryMajorId)}`);
+        if (q.categoryMediumId) arr.push(`中: ${getName(q.categoryMediumId)}`);
+        if (q.categoryMinorId) arr.push(`小: ${getName(q.categoryMinorId)}`);
+        str = arr.join(' / ');
+    }
+    
+    return str ? ` [${str}]` : '';
+}
+
 // Google Driveの共有リンクを直リンクに変換する汎用関数
 function convertGoogleDriveUrl(url) {
     if (!url) return url;
@@ -510,15 +539,16 @@ function renderQuestionList() {
         }
 
         let badgeHtml = '';
+        // ...バッジの設定処理...
         if (q.type === 'mcq') badgeHtml = `<span style="background-color: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 8px; font-weight: bold;">四択</span>`;
         else if (q.type === 'dd') badgeHtml = `<span style="background-color: #ede9fe; color: #7c3aed; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 8px; font-weight: bold;">D&D</span>`;
         else if (q.type === 'sim') badgeHtml = `<span style="background-color: #fef08a; color: #a16207; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 8px; font-weight: bold;">Sim</span>`;
 
-        // ★修正: カテゴリ文字列を取得して追記
-        const catStr = buildCategoryDisplayString(q);
+        // ★修正: カテゴリ文字列を関数から取得
+        const catStr = getCategoryDisplayName(q);
 
         div.innerHTML = `
-            <div style="font-size: 0.85em; color: var(--format-text, #64748b); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap;">
+            <div style="font-size: 0.85em; color: var(--format-text, #64748b); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
                 ${badgeHtml}<span>ID:${q.id}${catStr}</span>
             </div>
             <div style="font-size: 0.95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -1107,8 +1137,8 @@ function renderCategoryTargetList() {
         
         const snippet = q.question.length > 20 ? q.question.substring(0, 20) + '...' : q.question;
         
-        // ★修正: カテゴリ文字列を取得して追記
-        const catStr = buildCategoryDisplayString(q);
+        // ★修正: 大項目のみハードコードされていた部分を関数に置き換え
+        const catStr = getCategoryDisplayName(q);
         
         const isUncategorized = (!q.categoryMajorId && !q.categoryMediumId && !q.categoryMinorId) ? 'true' : 'false';
 

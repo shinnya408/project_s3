@@ -54,7 +54,7 @@
                 <h3>登録済み問題一覧</h3>
             </div>
             
-            <!-- ★修正: flex-wrapを追加し、表示モードのselect要素を追加 -->
+            <!-- ★修正: flex-wrapを追加し、表示モードのセレクトボックスを追加 -->
             <div class="form-group" style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
                 <input type="text" id="search-id-input" placeholder="🔍 IDで検索 (例: 12)" oninput="renderQuestionList()" style="background-color: var(--bg-color); flex: 1; min-width: 120px;">
                 
@@ -66,12 +66,12 @@
                     <option value="minor-asc">小項目順</option>
                 </select>
 
-                <!-- ★追加: カテゴリの表示切り替え -->
+                <!-- ★追加: 見出しに表示するカテゴリの切り替え -->
                 <select id="cat-display-mode" onchange="renderQuestionList(); renderCategoryTargetList();" style="width: auto; background-color: var(--bg-color);">
-                    <option value="major">表示: 大項目のみ</option>
-                    <option value="medium">表示: 中項目のみ</option>
-                    <option value="minor">表示: 小項目のみ</option>
-                    <option value="all">表示: すべて</option>
+                    <option value="major">表示: 大項目</option>
+                    <option value="medium">表示: 中項目</option>
+                    <option value="minor">表示: 小項目</option>
+                    <option value="all">表示: 全て</option>
                 </select>
             </div>
 
