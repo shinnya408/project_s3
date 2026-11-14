@@ -35,7 +35,19 @@
             </select>
         </div>
 
-        <!-- ★ 修正: テーブルを横スクロール可能なラッパーで囲む -->
+        <!-- 検索・ソート機能 UI -->
+        <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" id="search-user-input" class="form-control" placeholder="🔍 名前またはメールアドレスで検索" oninput="renderUserList()" style="flex: 1; min-width: 200px;">
+            
+            <select id="sort-user-select" class="form-control" onchange="renderUserList()" style="width: auto;">
+                <option value="id-asc">ID順 (昇順)</option>
+                <option value="id-desc">ID順 (降順)</option>
+                <option value="name-asc">名前順 (昇順)</option>
+                <option value="name-desc">名前順 (降順)</option>
+            </select>
+        </div>
+
+        <!-- テーブルを横スクロール可能なラッパーで囲む -->
         <div class="table-responsive">
             <table class="user-table">
                 <thead>
